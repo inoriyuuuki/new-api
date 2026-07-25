@@ -1,4 +1,4 @@
-name: Publish Docker image (manual branch)
+name: Publish Docker image (manual branch, linux/amd64)
 
 on:
   workflow_dispatch:
@@ -49,20 +49,10 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Prepared Docker tags for $BRANCH_NAME at $SHORT_SHA"
 
-  build_single_arch:
-    name: Build & push (${{ matrix.arch }}) [native]
+  build:
+    name: Build & push (linux/amd64)
     needs: [prepare]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: amd64
-            platform: linux/amd64
-            runner: ubuntu-latest
-          - arch: arm64
-            platform: linux/arm64
-            runner: ubuntu-24.04-arm
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
@@ -76,7 +66,7 @@ jobs:
       - name: Write VERSION
         run: |
           echo "${{ needs.prepare.outputs.version }}" > VERSION
-          echo "Publishing version: ${{ needs.prepare.outputs.version }} for ${{ matrix.arch }}"
+          echo "Publishing version: ${{ needs.prepare.outputs.version }} for linux/amd64"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -92,18 +82,18 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: |
-            calciumion/new-api
+            inoriyuuki/new-api
 
-      - name: Build & push single-arch
+      - name: Build & push
         id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          platforms: ${{ matrix.platform }}
+          platforms: linux/amd64
           push: true
           tags: |
-            calciumion/new-api:${{ needs.prepare.outputs.tag_prefix }}-${{ matrix.arch }}
-            calciumion/new-api:${{ needs.prepare.outputs.version }}-${{ matrix.arch }}
+            inoriyuuki/new-api:${{ needs.prepare.outputs.tag_prefix }}
+            inoriyuuki/new-api:${{ needs.prepare.outputs.version }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -114,57 +104,13 @@ jobs:
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Sign image with cosign
-        run: cosign sign --yes calciumion/new-api@${{ steps.build.outputs.digest }}
+        run: cosign sign --yes inoriyuuki/new-api@${{ steps.build.outputs.digest }}
 
       - name: Output digest
         run: |
-          echo "### Docker Image Digest (${{ matrix.arch }})" >> $GITHUB_STEP_SUMMARY
+          echo "### Docker Image Digest (linux/amd64)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "calciumion/new-api:${{ needs.prepare.outputs.tag_prefix }}-${{ matrix.arch }}" >> $GITHUB_STEP_SUMMARY
-          echo "calciumion/new-api:${{ needs.prepare.outputs.version }}-${{ matrix.arch }}" >> $GITHUB_STEP_SUMMARY
+          echo "inoriyuuki/new-api:${{ needs.prepare.outputs.tag_prefix }}" >> $GITHUB_STEP_SUMMARY
+          echo "inoriyuuki/new-api:${{ needs.prepare.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "${{ steps.build.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
-  create_manifests:
-    name: Create multi-arch manifests (Docker Hub)
-    needs: [prepare, build_single_arch]
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-    steps:
-      - name: Log in to Docker Hub
-        uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4 # v4.3.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Create & push manifest (Docker Hub - branch)
-        run: |
-          docker buildx imagetools create \
-            -t calciumion/new-api:${{ needs.prepare.outputs.tag_prefix }} \
-            calciumion/new-api:${{ needs.prepare.outputs.tag_prefix }}-amd64 \
-            calciumion/new-api:${{ needs.prepare.outputs.tag_prefix }}-arm64
-
-      - name: Create & push manifest (Docker Hub - versioned)
-        run: |
-          docker buildx imagetools create \
-            -t calciumion/new-api:${{ needs.prepare.outputs.version }} \
-            calciumion/new-api:${{ needs.prepare.outputs.version }}-amd64 \
-            calciumion/new-api:${{ needs.prepare.outputs.version }}-arm64
-
-      - name: Install cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-
-      - name: Sign manifests with cosign
-        run: |
-          cosign sign --yes calciumion/new-api:${{ needs.prepare.outputs.tag_prefix }}
-          cosign sign --yes calciumion/new-api:${{ needs.prepare.outputs.version }}
-
-      - name: Output manifest digest
-        run: |
-          echo "### Multi-arch Manifest Digests" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          docker buildx imagetools inspect calciumion/new-api:${{ needs.prepare.outputs.tag_prefix }} >> $GITHUB_STEP_SUMMARY
-          echo "---" >> $GITHUB_STEP_SUMMARY
-          docker buildx imagetools inspect calciumion/new-api:${{ needs.prepare.outputs.version }} >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
