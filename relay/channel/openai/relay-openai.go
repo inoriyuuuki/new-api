@@ -131,6 +131,27 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 			}
 		}
 		if len(data) > 0 {
+			// 提前提取 usage，避免后续被 inference-cost 等无 usage 的 chunk 覆盖
+			var streamChunk dto.ChatCompletionsStreamResponse
+			if err := common.UnmarshalJsonStr(data, &streamChunk); err == nil {
+				if service.ValidUsage(streamChunk.Usage) {
+					usage = streamChunk.Usage
+					containStreamUsage = true
+					if streamChunk.Id != "" {
+						responseId = streamChunk.Id
+					}
+					if streamChunk.Created != 0 {
+						createAt = streamChunk.Created
+					}
+					if streamChunk.Model != "" {
+						model = streamChunk.Model
+					}
+					if streamChunk.SystemFingerprint != nil {
+						systemFingerprint = *streamChunk.SystemFingerprint
+					}
+				}
+			}
+
 			// 对音频模型，保存倒数第二个stream data
 			if isAudioModel && lastStreamData != "" {
 				secondLastStreamData = lastStreamData
