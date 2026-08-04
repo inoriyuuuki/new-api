@@ -1,0 +1,7 @@
+private.env
+.env
+*.db
+*.db-journal
+logs/
+backups/
+*.log

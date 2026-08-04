@@ -1,0 +1,22 @@
+#!/usr/bin/expect -f
+set timeout 1800
+set host [lindex $argv 0]
+set remote_cmd [lindex $argv 1]
+if {![info exists env(SSH_PASSWORD)]} {
+  puts stderr "SSH_PASSWORD is not set"
+  exit 2
+}
+spawn ssh -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 $host $remote_cmd
+expect {
+  -re {(?i)password:} {
+    send -- "$env(SSH_PASSWORD)\r"
+    exp_continue
+  }
+  eof {}
+  timeout {
+    puts stderr "SSH timeout"
+    exit 124
+  }
+}
+catch wait result
+exit [lindex $result 3]

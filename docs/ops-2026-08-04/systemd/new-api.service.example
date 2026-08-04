@@ -1,0 +1,19 @@
+[Unit]
+Description=New API Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__SERVICE_USER__
+WorkingDirectory=/home/__SERVICE_USER__/new-api_data
+EnvironmentFile=/home/__SERVICE_USER__/new-api_data/.env
+ExecStart=/home/__SERVICE_USER__/new-api/new-api --port 9025 --log-dir /home/__SERVICE_USER__/new-api_data/logs
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
