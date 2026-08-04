@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/types"
 
+	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-gonic/gin"
 
 	"gorm.io/gorm"
@@ -100,7 +101,27 @@ func ensureLogRequestId(log *Log) {
 
 func createLog(log *Log) error {
 	ensureLogRequestId(log)
-	return LOG_DB.Create(log).Error
+	if err := LOG_DB.Create(log).Error; err != nil {
+		return err
+	}
+
+	// Conversation capture is persisted asynchronously, so either the context
+	// row or the usage log can win the race. Once a stable SQL log row exists,
+	// refresh DB A by request_id. This linkage is best-effort and must never
+	// turn a successfully written usage log into an API failure.
+	if CONVERSATION_DB != nil && log.RequestId != "" &&
+		(log.Type == LogTypeConsume || log.Type == LogTypeError) &&
+		!common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
+		requestID := log.RequestId
+		gopool.Go(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := BackfillConversationLogID(ctx, requestID); err != nil {
+				common.SysLog("failed to link conversation context to log: " + err.Error())
+			}
+		})
+	}
+	return nil
 }
 
 func clickHouseLogOrder(prefix string) string {

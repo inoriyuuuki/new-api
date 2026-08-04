@@ -16,14 +16,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { Link } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
-import { GitBranch, Sparkles, KeyRound } from 'lucide-react'
+import { Eye, GitBranch, Sparkles, KeyRound } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { GroupBadge } from '@/components/group-badge'
 import { StatusBadge, type StatusBadgeProps } from '@/components/status-badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import {
   Popover,
   PopoverContent,
@@ -830,6 +832,32 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
       },
       size: 180,
       maxSize: 200,
+    },
+    {
+      id: 'view_context',
+      header: t('Context'),
+      cell: ({ row }) => {
+        const requestId = row.original.request_id
+        if (!requestId) return null
+        return (
+          <Button
+            variant='outline'
+            size='sm'
+            className='h-7 gap-1.5'
+            render={
+              <Link
+                to='/usage-logs/context/$requestId'
+                params={{ requestId }}
+              />
+            }
+          >
+            <Eye className='size-3.5' />
+            {t('View Context')}
+          </Button>
+        )
+      },
+      enableHiding: false,
+      size: 130,
     }
   )
 

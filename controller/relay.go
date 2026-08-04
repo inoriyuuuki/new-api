@@ -76,6 +76,16 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		ws          *websocket.Conn
 	)
 
+	// Capture conversation request/response context into the local DB A.
+	// The finalize defer is registered before the error-writer defer below so
+	// that error responses written on exit are captured as well. WebSocket
+	// realtime and non-conversation formats are skipped (capture == nil), so
+	// c.Writer is never wrapped for them.
+	capture := newConversationCapture(c, relayFormat)
+	if capture != nil {
+		defer capture.finalize(c)
+	}
+
 	if relayFormat == types.RelayFormatOpenAIRealtime {
 		var err error
 		ws, err = upgrader.Upgrade(c.Writer, c.Request, nil)
@@ -107,6 +117,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	}()
 
 	request, err := helper.GetAndValidateRequest(c, relayFormat)
+	if capture != nil {
+		capture.readRequestBody(c)
+	}
 	if err != nil {
 		// Map "request body too large" to 413 so clients can handle it correctly
 		if common.IsRequestBodyTooLargeError(err) || errors.Is(err, common.ErrRequestBodyTooLarge) {
@@ -121,6 +134,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	if err != nil {
 		newAPIError = types.NewError(err, types.ErrorCodeGenRelayInfoFailed)
 		return
+	}
+	if capture != nil {
+		capture.setRelayInfo(relayInfo)
 	}
 
 	needSensitiveCheck := setting.ShouldCheckPromptSensitive()

@@ -326,6 +326,14 @@ func InitResources() error {
 		return err
 	}
 
+	// Initialize per-node local conversation context database (DB A), after
+	// the main/log databases so its log_id backfill can query LOG_DB.
+	err = model.InitContextDB()
+	if err != nil {
+		common.FatalLog("failed to initialize conversation context database: " + err.Error())
+		return err
+	}
+
 	// Initialize Redis
 	err = common.InitRedisClient()
 	if err != nil {

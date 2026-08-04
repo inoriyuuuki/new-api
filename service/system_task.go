@@ -419,6 +419,15 @@ func runLogCleanupTask(ctx context.Context, task *model.SystemTask, runnerID str
 		return
 	}
 
+	// Conversation contexts (DB A) are cleaned with the same target timestamp
+	// so they do not outlive their usage logs. Favorites (DB B) are immutable
+	// snapshots and are intentionally left untouched. A cross-database failure
+	// fails the whole task; the delete is idempotent so retries are safe.
+	if _, err := model.DeleteOldConversationContextsByCreatedAt(ctx, payload.TargetTimestamp); err != nil {
+		failSystemTask(task, runnerID, err)
+		return
+	}
+
 	result := LogCleanupResult{DeletedCount: state.Processed}
 	if err := model.FinishSystemTask(task.TaskID, runnerID, model.SystemTaskStatusSucceeded, result, ""); err != nil {
 		logSystemTaskLockError(ctx, task, err)

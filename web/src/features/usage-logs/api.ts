@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
 
-import { buildQueryParams } from './lib/utils'
+import { buildQueryParams } from './lib/query-params'
 import type {
   GetLogsParams,
   GetLogsResponse,
@@ -27,6 +27,11 @@ import type {
   GetMidjourneyLogsParams,
   GetTaskLogsParams,
   UserInfo,
+  GetConversationContextsParams,
+  GetFavoriteContextsParams,
+  ConversationContextListResponse,
+  ConversationContext,
+  FavoriteConversationContext,
 } from './types'
 
 // ============================================================================
@@ -110,3 +115,85 @@ export const getAllTaskLogs = (params: GetTaskLogsParams) =>
 
 export const getUserTaskLogs = (params: GetTaskLogsParams) =>
   fetchLogs('/api/task', params, false)
+
+// ============================================================================
+// Conversation Context APIs
+// ============================================================================
+//
+// Backend contract (unified UserAuth API, no /self variant):
+//   GET    /api/conversation-context?p&page_size&request_id&user_id
+//   GET    /api/conversation-context/item/:request_id
+//   POST   /api/conversation-context/item/:request_id/favorite
+//   GET    /api/conversation-context/favorites?p&page_size
+//   GET    /api/conversation-context/favorites/:id
+//   DELETE /api/conversation-context/favorites/:id
+
+const CONVERSATION_CONTEXT_PATH = '/api/conversation-context'
+
+export const getConversationContexts = async (
+  params: GetConversationContextsParams = {}
+): Promise<ConversationContextListResponse> => {
+  const queryParams = buildQueryParams(
+    params as unknown as Record<string, unknown>
+  )
+  const res = await api.get(
+    `${CONVERSATION_CONTEXT_PATH}?${queryParams.toString()}`
+  )
+  return res.data
+}
+
+export const getConversationContextDetail = async (
+  requestId: string
+): Promise<{
+  success: boolean
+  message?: string
+  data?: ConversationContext
+}> => {
+  const res = await api.get(
+    `${CONVERSATION_CONTEXT_PATH}/item/${encodeURIComponent(requestId)}`
+  )
+  return res.data
+}
+
+export const favoriteConversationContext = async (
+  requestId: string
+): Promise<{ success: boolean; message?: string; data?: unknown }> => {
+  const res = await api.post(
+    `${CONVERSATION_CONTEXT_PATH}/item/${encodeURIComponent(requestId)}/favorite`
+  )
+  return res.data
+}
+
+export const getFavoriteContexts = async (
+  params: GetFavoriteContextsParams = {}
+): Promise<ConversationContextListResponse> => {
+  const queryParams = buildQueryParams(
+    params as unknown as Record<string, unknown>
+  )
+  const res = await api.get(
+    `${CONVERSATION_CONTEXT_PATH}/favorites?${queryParams.toString()}`
+  )
+  return res.data
+}
+
+export const getFavoriteContextDetail = async (
+  id: number
+): Promise<{
+  success: boolean
+  message?: string
+  data?: FavoriteConversationContext
+}> => {
+  const res = await api.get(
+    `${CONVERSATION_CONTEXT_PATH}/favorites/${encodeURIComponent(String(id))}`
+  )
+  return res.data
+}
+
+export const deleteFavoriteContext = async (
+  id: number
+): Promise<{ success: boolean; message?: string; data?: unknown }> => {
+  const res = await api.delete(
+    `${CONVERSATION_CONTEXT_PATH}/favorites/${encodeURIComponent(String(id))}`
+  )
+  return res.data
+}

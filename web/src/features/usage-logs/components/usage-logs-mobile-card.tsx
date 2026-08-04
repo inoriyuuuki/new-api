@@ -16,8 +16,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { Link } from '@tanstack/react-router'
 import { flexRender, type Cell, type Table } from '@tanstack/react-table'
-import { Database } from 'lucide-react'
+import { Database, Eye } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -26,6 +27,7 @@ import {
   type StatusVariant,
 } from '@/components/status-badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import {
   Empty,
   EmptyDescription,
@@ -365,6 +367,25 @@ function CommonLogsCard<TData>({
           className='col-span-2 bg-transparent px-0 py-0'
         />
       </div>
+
+      {rowData?.request_id && (
+        <div className='flex justify-end'>
+          <Button
+            variant='outline'
+            size='sm'
+            className='h-7 gap-1.5'
+            render={
+              <Link
+                to='/usage-logs/context/$requestId'
+                params={{ requestId: rowData.request_id }}
+              />
+            }
+          >
+            <Eye className='size-3.5' />
+            {t('View Context')}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

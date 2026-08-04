@@ -277,6 +277,20 @@ func SetApiRouter(router *gin.Engine) {
 		logRoute.GET("/self", middleware.UserAuth(), controller.GetUserLogs)
 		logRoute.GET("/self/search", middleware.UserAuth(), middleware.SearchRateLimit(), controller.SearchUserLogs)
 
+		// Conversation context (DB A) + favorites (DB B). Static /favorites
+		// routes are registered before the parameterized /item/:request_id
+		// routes so they never collide with a :request_id segment.
+		conversationContextRoute := apiRouter.Group("/conversation-context")
+		conversationContextRoute.Use(middleware.UserAuth())
+		{
+			conversationContextRoute.GET("/", controller.GetConversationContexts)
+			conversationContextRoute.GET("/favorites", controller.GetFavoriteConversationContexts)
+			conversationContextRoute.GET("/favorites/:id", controller.GetFavoriteConversationContext)
+			conversationContextRoute.DELETE("/favorites/:id", controller.DeleteFavoriteConversationContext)
+			conversationContextRoute.GET("/item/:request_id", controller.GetConversationContext)
+			conversationContextRoute.POST("/item/:request_id/favorite", controller.FavoriteConversationContext)
+		}
+
 		systemTaskRoute := apiRouter.Group("/system-task")
 		systemTaskRoute.Use(middleware.RootAuth())
 		{

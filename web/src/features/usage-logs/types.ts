@@ -19,7 +19,13 @@ For commercial licensing, please contact support@quantumnous.com
 /**
  * Type definitions for usage logs
  */
-import type { UsageLog } from './data/schema'
+import type {
+  ConversationContext,
+  FavoriteConversationContext,
+  UsageLog,
+} from './data/schema'
+
+export type { ConversationContext, FavoriteConversationContext }
 
 // ============================================================================
 // Log Category Types
@@ -403,4 +409,36 @@ export interface UserInfo {
   aff_count?: number
   aff_quota?: number
   remark?: string
+}
+
+// ============================================================================
+// Conversation Context Types
+// ============================================================================
+
+/**
+ * Shared paginated response envelope for conversation context lists.
+ */
+export interface ConversationContextListResponse {
+  success: boolean
+  message?: string
+  data?: {
+    items: ConversationContext[] | FavoriteConversationContext[]
+    total: number
+    page: number
+    page_size: number
+  }
+}
+
+export interface GetConversationContextsParams {
+  p?: number
+  page_size?: number
+  request_id?: string
+  /** Admin-only filter; regular users are always scoped to themselves. */
+  user_id?: number
+}
+
+export interface GetFavoriteContextsParams {
+  p?: number
+  page_size?: number
+  request_id?: string
 }

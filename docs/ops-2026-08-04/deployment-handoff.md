@@ -17,7 +17,8 @@
 公网 TCP :9025
   → systemd: new-api.service
   → $HOME/new-api/new-api
-  → $HOME/new-api_data/one-api.db
+  → $HOME/new-api_data/one-api.db（主数据与收藏的对话上下文）
+  → $HOME/new-api_data/conversation-context.db（普通对话上下文）
 ```
 
 ## 服务器布局
@@ -28,7 +29,8 @@
 | Go 二进制 | `$HOME/new-api/new-api` |
 | 前端产物 | `$HOME/new-api/web/dist`（构建时嵌入 Go 二进制） |
 | 生产配置 | `$HOME/new-api_data/.env` |
-| SQLite | `$HOME/new-api_data/one-api.db` |
+| 主 SQLite | `$HOME/new-api_data/one-api.db` |
+| 对话上下文 SQLite | `$HOME/new-api_data/conversation-context.db` |
 | 日志目录 | `$HOME/new-api_data/logs` |
 | 备份目录 | `$HOME/new-api_data/backups` |
 | systemd 单元 | `/etc/systemd/system/new-api.service` |
@@ -56,7 +58,8 @@
 
 ## 升级与回滚原则
 
-new-api 启动时会执行 GORM AutoMigrate。升级前必须备份：
+new-api 启动时会执行 GORM AutoMigrate。升级前必须备份 `.env`、主数据库，
+并在对话上下文数据库存在时一并备份：
 
 ```bash
 ./docs/ops-2026-08-04/scripts/backup.sh
@@ -65,12 +68,15 @@ new-api 启动时会执行 GORM AutoMigrate。升级前必须备份：
 升级建议顺序：
 
 1. 记录当前 commit 和二进制版本。
-2. 备份 `.env` 与 `one-api.db`。
+2. 备份 `.env`、`one-api.db` 与已存在的 `conversation-context.db`。
 3. `git pull --ff-only`。
 4. 重新构建前端和后端。
 5. `sudo systemctl restart new-api`。
 6. 执行健康检查并检查 journal。
 7. 若迁移或启动失败，停止服务、恢复数据库与配置、回退代码/二进制后再启动。
+
+普通对话上下文默认写入本机独立 SQLite，不读取 DSN 配置。日志清理任务会按同一时间窗
+清理普通上下文；已经收藏到主数据库的完整快照不参与自动清理，只能由所属用户手动删除。
 
 ## 常用命令
 

@@ -48,3 +48,44 @@ export const usageLogSchema = z.object({
 })
 
 export type UsageLog = z.infer<typeof usageLogSchema>
+
+// ============================================================================
+// Conversation context schemas
+// ============================================================================
+
+/**
+ * Captured request/response context linked to a usage log entry.
+ * Stored in a separate log database (DB A) to keep the main database small.
+ */
+export const conversationContextSchema = z.object({
+  id: z.number().default(0),
+  log_id: z.number().default(0),
+  request_id: z.string().default(''),
+  user_id: z.number().default(0),
+  created_at: z.number().default(0),
+  request_path: z.string().default(''),
+  relay_format: z.string().default(''),
+  model_name: z.string().default(''),
+  request_body: z.string().default(''),
+  response_body: z.string().default(''),
+  response_status: z.number().default(0),
+  is_stream: z.boolean().default(false),
+  capture_status: z.string().default(''),
+  is_favorite: z.boolean().default(false),
+})
+
+export type ConversationContext = z.infer<typeof conversationContextSchema>
+
+/**
+ * Favorite snapshot of a conversation context. Lives in the main database
+ * (DB B) so it survives context/log cleanup and is only removed manually.
+ */
+export const favoriteConversationContextSchema =
+  conversationContextSchema.extend({
+    favorited_at: z.number().default(0),
+    source_user_id: z.number().default(0),
+  })
+
+export type FavoriteConversationContext = z.infer<
+  typeof favoriteConversationContextSchema
+>

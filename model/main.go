@@ -302,6 +302,7 @@ func migrateDB() error {
 		&SystemTaskLock{},
 		&CasbinRule{},
 		&AuthzRole{},
+		&FavoriteConversationContext{},
 	)
 	if err != nil {
 		return err
@@ -363,6 +364,7 @@ func migrateDBFast() error {
 		{&SystemInstance{}, "SystemInstance"},
 		{&SystemTask{}, "SystemTask"},
 		{&SystemTaskLock{}, "SystemTaskLock"},
+		{&FavoriteConversationContext{}, "FavoriteConversationContext"},
 	}
 	// 动态计算migration数量，确保errChan缓冲区足够大
 	errChan := make(chan error, len(migrations))
@@ -711,6 +713,12 @@ func closeDB(db *gorm.DB) error {
 func CloseDB() error {
 	if LOG_DB != DB {
 		err := closeDB(LOG_DB)
+		if err != nil {
+			return err
+		}
+	}
+	if CONVERSATION_DB != nil && CONVERSATION_DB != DB && CONVERSATION_DB != LOG_DB {
+		err := closeDB(CONVERSATION_DB)
 		if err != nil {
 			return err
 		}

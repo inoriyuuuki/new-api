@@ -21,3 +21,10 @@ cp -a "$data_dir/one-api.db" "$backup_dir/one-api-$timestamp.db"
 printf 'Backup complete:\n  %s\n  %s\n' \
   "$backup_dir/env-$timestamp" \
   "$backup_dir/one-api-$timestamp.db"
+
+context_db="$data_dir/conversation-context.db"
+if [[ -f "$context_db" ]]; then
+  context_backup="$backup_dir/conversation-context-$timestamp.db"
+  cp -a "$context_db" "$context_backup"
+  printf '  %s\n' "$context_backup"
+fi

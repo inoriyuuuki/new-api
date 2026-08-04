@@ -67,6 +67,8 @@ import { Route as AuthenticatedSystemSettingsSecurityIndexRouteImport } from './
 import { Route as AuthenticatedSystemSettingsSecuritySectionRouteImport } from './routes/_authenticated/system-settings/security/$section'
 import { Route as AuthenticatedSystemSettingsSiteIndexRouteImport } from './routes/_authenticated/system-settings/site/index'
 import { Route as AuthenticatedSystemSettingsSiteSectionRouteImport } from './routes/_authenticated/system-settings/site/$section'
+import { Route as AuthenticatedUsageLogsContextRequestIdRouteImport } from './routes/_authenticated/usage-logs/context/$requestId'
+import { Route as AuthenticatedUsageLogsFavoriteContextIdRouteImport } from './routes/_authenticated/usage-logs/favorite-context/$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -386,6 +388,18 @@ const AuthenticatedSystemSettingsSiteSectionRoute =
     path: '/site/$section',
     getParentRoute: () => AuthenticatedSystemSettingsRouteRoute,
   } as any)
+const AuthenticatedUsageLogsContextRequestIdRoute =
+  AuthenticatedUsageLogsContextRequestIdRouteImport.update({
+    id: '/usage-logs/context/$requestId',
+    path: '/usage-logs/context/$requestId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedUsageLogsFavoriteContextIdRoute =
+  AuthenticatedUsageLogsFavoriteContextIdRouteImport.update({
+    id: '/usage-logs/favorite-context/$id',
+    path: '/usage-logs/favorite-context/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -437,6 +451,8 @@ export interface FileRoutesByFullPath {
   '/system-settings/operations/$section': typeof AuthenticatedSystemSettingsOperationsSectionRoute
   '/system-settings/security/$section': typeof AuthenticatedSystemSettingsSecuritySectionRoute
   '/system-settings/site/$section': typeof AuthenticatedSystemSettingsSiteSectionRoute
+  '/usage-logs/context/$requestId': typeof AuthenticatedUsageLogsContextRequestIdRoute
+  '/usage-logs/favorite-context/$id': typeof AuthenticatedUsageLogsFavoriteContextIdRoute
   '/system-settings/auth/': typeof AuthenticatedSystemSettingsAuthIndexRoute
   '/system-settings/billing/': typeof AuthenticatedSystemSettingsBillingIndexRoute
   '/system-settings/content/': typeof AuthenticatedSystemSettingsContentIndexRoute
@@ -494,6 +510,8 @@ export interface FileRoutesByTo {
   '/system-settings/operations/$section': typeof AuthenticatedSystemSettingsOperationsSectionRoute
   '/system-settings/security/$section': typeof AuthenticatedSystemSettingsSecuritySectionRoute
   '/system-settings/site/$section': typeof AuthenticatedSystemSettingsSiteSectionRoute
+  '/usage-logs/context/$requestId': typeof AuthenticatedUsageLogsContextRequestIdRoute
+  '/usage-logs/favorite-context/$id': typeof AuthenticatedUsageLogsFavoriteContextIdRoute
   '/system-settings/auth': typeof AuthenticatedSystemSettingsAuthIndexRoute
   '/system-settings/billing': typeof AuthenticatedSystemSettingsBillingIndexRoute
   '/system-settings/content': typeof AuthenticatedSystemSettingsContentIndexRoute
@@ -555,6 +573,8 @@ export interface FileRoutesById {
   '/_authenticated/system-settings/operations/$section': typeof AuthenticatedSystemSettingsOperationsSectionRoute
   '/_authenticated/system-settings/security/$section': typeof AuthenticatedSystemSettingsSecuritySectionRoute
   '/_authenticated/system-settings/site/$section': typeof AuthenticatedSystemSettingsSiteSectionRoute
+  '/_authenticated/usage-logs/context/$requestId': typeof AuthenticatedUsageLogsContextRequestIdRoute
+  '/_authenticated/usage-logs/favorite-context/$id': typeof AuthenticatedUsageLogsFavoriteContextIdRoute
   '/_authenticated/system-settings/auth/': typeof AuthenticatedSystemSettingsAuthIndexRoute
   '/_authenticated/system-settings/billing/': typeof AuthenticatedSystemSettingsBillingIndexRoute
   '/_authenticated/system-settings/content/': typeof AuthenticatedSystemSettingsContentIndexRoute
@@ -615,6 +635,8 @@ export interface FileRouteTypes {
     | '/system-settings/operations/$section'
     | '/system-settings/security/$section'
     | '/system-settings/site/$section'
+    | '/usage-logs/context/$requestId'
+    | '/usage-logs/favorite-context/$id'
     | '/system-settings/auth/'
     | '/system-settings/billing/'
     | '/system-settings/content/'
@@ -672,6 +694,8 @@ export interface FileRouteTypes {
     | '/system-settings/operations/$section'
     | '/system-settings/security/$section'
     | '/system-settings/site/$section'
+    | '/usage-logs/context/$requestId'
+    | '/usage-logs/favorite-context/$id'
     | '/system-settings/auth'
     | '/system-settings/billing'
     | '/system-settings/content'
@@ -732,6 +756,8 @@ export interface FileRouteTypes {
     | '/_authenticated/system-settings/operations/$section'
     | '/_authenticated/system-settings/security/$section'
     | '/_authenticated/system-settings/site/$section'
+    | '/_authenticated/usage-logs/context/$requestId'
+    | '/_authenticated/usage-logs/favorite-context/$id'
     | '/_authenticated/system-settings/auth/'
     | '/_authenticated/system-settings/billing/'
     | '/_authenticated/system-settings/content/'
@@ -1168,6 +1194,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSystemSettingsSiteSectionRouteImport
       parentRoute: typeof AuthenticatedSystemSettingsRouteRoute
     }
+    '/_authenticated/usage-logs/context/$requestId': {
+      id: '/_authenticated/usage-logs/context/$requestId'
+      path: '/usage-logs/context/$requestId'
+      fullPath: '/usage-logs/context/$requestId'
+      preLoaderRoute: typeof AuthenticatedUsageLogsContextRequestIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/usage-logs/favorite-context/$id': {
+      id: '/_authenticated/usage-logs/favorite-context/$id'
+      path: '/usage-logs/favorite-context/$id'
+      fullPath: '/usage-logs/favorite-context/$id'
+      preLoaderRoute: typeof AuthenticatedUsageLogsFavoriteContextIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -1274,6 +1314,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedUsageLogsIndexRoute: typeof AuthenticatedUsageLogsIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
   AuthenticatedWalletIndexRoute: typeof AuthenticatedWalletIndexRoute
+  AuthenticatedUsageLogsContextRequestIdRoute: typeof AuthenticatedUsageLogsContextRequestIdRoute
+  AuthenticatedUsageLogsFavoriteContextIdRoute: typeof AuthenticatedUsageLogsFavoriteContextIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -1298,6 +1340,10 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedUsageLogsIndexRoute: AuthenticatedUsageLogsIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
   AuthenticatedWalletIndexRoute: AuthenticatedWalletIndexRoute,
+  AuthenticatedUsageLogsContextRequestIdRoute:
+    AuthenticatedUsageLogsContextRequestIdRoute,
+  AuthenticatedUsageLogsFavoriteContextIdRoute:
+    AuthenticatedUsageLogsFavoriteContextIdRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

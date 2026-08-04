@@ -26,7 +26,9 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CacheStatsDialog } from '@/features/system-settings/general/channel-affinity/cache-stats-dialog'
 import { useSidebarConfig } from '@/hooks/use-sidebar-config'
 
+import { ConversationContextsTable } from './components/conversation-contexts-table'
 import { UserInfoDialog } from './components/dialogs/user-info-dialog'
+import { FavoriteContextsTable } from './components/favorite-contexts-table'
 import {
   type LogsViewScope,
   UsageLogsProvider,
@@ -41,7 +43,6 @@ import {
 } from './section-registry'
 
 const route = getRouteApi('/_authenticated/usage-logs/$section')
-const TASK_LOG_SECTIONS = ['drawing', 'task'] as const
 
 const SECTION_META: Record<UsageLogsSectionId, { titleKey: string }> = {
   common: {
@@ -53,7 +54,28 @@ const SECTION_META: Record<UsageLogsSectionId, { titleKey: string }> = {
   task: {
     titleKey: 'Task Logs',
   },
+  contexts: {
+    titleKey: 'Conversation Contexts',
+  },
+  'favorite-contexts': {
+    titleKey: 'Favorite Contexts',
+  },
 }
+
+/**
+ * Parallel tab groups shown alongside the default/common logs section. Each
+ * group renders its own tab switcher on the corresponding pages.
+ */
+const TAB_GROUPS: Array<{
+  title: string
+  sections: UsageLogsSectionId[]
+}> = [
+  { title: 'Task Logs', sections: ['drawing', 'task'] },
+  {
+    title: 'Conversation Contexts',
+    sections: ['contexts', 'favorite-contexts'],
+  },
+]
 
 function UsageLogsContent() {
   const { t } = useTranslation()
@@ -73,29 +95,37 @@ function UsageLogsContent() {
   } = useUsageLogsContext()
   const { canManageScope, viewScope, setViewScope } = useLogsViewScope()
   const tabNavGroups = useMemo<NavGroup[]>(
-    () => [
-      {
-        title: 'Task Logs',
-        items: TASK_LOG_SECTIONS.map((section) => ({
+    () =>
+      TAB_GROUPS.map((group) => ({
+        title: group.title,
+        items: group.sections.map((section) => ({
           title: SECTION_META[section].titleKey,
           url: `/usage-logs/${section}`,
         })),
-      },
-    ],
+      })),
     []
   )
   const filteredTabGroups = useSidebarConfig(tabNavGroups)
+  const visibleSectionsByGroup = useMemo(
+    () =>
+      filteredTabGroups.map((group) =>
+        (group.items ?? [])
+          .map((item) => {
+            if (!('url' in item) || typeof item.url !== 'string') return null
+            return item.url.split('/').pop() ?? null
+          })
+          .filter((section): section is UsageLogsSectionId =>
+            Boolean(section && isUsageLogsSectionId(section))
+          )
+      ),
+    [filteredTabGroups]
+  )
   const visibleSections = useMemo(
     () =>
-      (filteredTabGroups[0]?.items ?? [])
-        .map((item) => {
-          if (!('url' in item) || typeof item.url !== 'string') return null
-          return item.url.split('/').pop() ?? null
-        })
-        .filter((section): section is UsageLogsSectionId =>
-          Boolean(section && isUsageLogsSectionId(section))
-        ),
-    [filteredTabGroups]
+      visibleSectionsByGroup.find((sections) =>
+        sections.includes(activeCategory)
+      ) ?? [],
+    [activeCategory, visibleSectionsByGroup]
   )
 
   const handleSectionChange = useCallback(
@@ -117,10 +147,8 @@ function UsageLogsContent() {
     [setViewScope]
   )
 
-  const pageMeta =
-    activeCategory === 'common' ? SECTION_META.common : SECTION_META.task
-  const showTaskSwitcher =
-    activeCategory !== 'common' && visibleSections.length > 1
+  const pageMeta = SECTION_META[activeCategory]
+  const showSectionSwitcher = visibleSections.length > 1
 
   return (
     <>
@@ -128,7 +156,7 @@ function UsageLogsContent() {
         <SectionPageLayout.Title>
           {t(pageMeta.titleKey)}
         </SectionPageLayout.Title>
-        {canManageScope && (
+        {canManageScope && activeCategory !== 'favorite-contexts' && (
           <SectionPageLayout.Actions>
             <Tabs value={viewScope} onValueChange={handleViewScopeChange}>
               <TabsList>
@@ -140,7 +168,7 @@ function UsageLogsContent() {
         )}
         <SectionPageLayout.Content>
           <div className='flex h-full min-h-0 flex-col gap-4'>
-            {showTaskSwitcher && (
+            {showSectionSwitcher && (
               <Tabs value={activeCategory} onValueChange={handleSectionChange}>
                 <TabsList className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'>
                   {visibleSections.map((section) => (
@@ -152,7 +180,19 @@ function UsageLogsContent() {
               </Tabs>
             )}
             <div className='min-h-0 flex-1'>
-              <UsageLogsTable logCategory={activeCategory} />
+              {activeCategory === 'common' && (
+                <UsageLogsTable logCategory='common' />
+              )}
+              {activeCategory === 'drawing' && (
+                <UsageLogsTable logCategory='drawing' />
+              )}
+              {activeCategory === 'task' && (
+                <UsageLogsTable logCategory='task' />
+              )}
+              {activeCategory === 'contexts' && <ConversationContextsTable />}
+              {activeCategory === 'favorite-contexts' && (
+                <FavoriteContextsTable />
+              )}
             </div>
           </div>
         </SectionPageLayout.Content>
