@@ -369,7 +369,7 @@ function CommonLogsCard<TData>({
         />
       </div>
 
-      {rowData?.request_id && (
+      {rowData?.has_context && rowData.request_id && (
         <div className='flex justify-end'>
           <Button
             variant='outline'

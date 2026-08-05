@@ -5245,6 +5245,13 @@
     "Back to contexts": "Retour aux contextes",
     "Failed to load conversation context": "Échec du chargement du contexte de conversation",
     "Favorited At": "Ajouté aux favoris le",
-    "Source User": "Utilisateur source"
+    "Source User": "Utilisateur source",
+    "Assistant": "Assistant",
+    "Final Response": "Réponse finale",
+    "Function": "Fonction",
+    "Message List": "Liste des messages",
+    "Messages": "Messages",
+    "Tool": "Outil",
+    "characters": "caractères"
   }
 }

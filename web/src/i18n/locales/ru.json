@@ -5245,6 +5245,13 @@
     "Back to contexts": "Назад к контекстам",
     "Failed to load conversation context": "Не удалось загрузить контекст разговора",
     "Favorited At": "Время добавления в избранное",
-    "Source User": "Исходный пользователь"
+    "Source User": "Исходный пользователь",
+    "Assistant": "Ассистент",
+    "Final Response": "Финальный ответ",
+    "Function": "Функция",
+    "Message List": "Список сообщений",
+    "Messages": "Сообщения",
+    "Tool": "Инструмент",
+    "characters": "символов"
   }
 }

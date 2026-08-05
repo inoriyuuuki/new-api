@@ -39,6 +39,7 @@ import {
   useFavoriteConversationContext,
 } from '../hooks/use-conversation-contexts'
 import type { ConversationContext, FavoriteConversationContext } from '../types'
+import { ConversationMessagesView } from './conversation-messages-view'
 
 /**
  * Best-effort pretty-printing: if the value parses as JSON it is re-serialized
@@ -304,6 +305,11 @@ export function ConversationContextDetail({
 
         <MetaGrid context={data} />
 
+        <ConversationMessagesView
+          requestBody={data.request_body}
+          responseBody={data.response_body}
+        />
+
         <JsonBlock title={t('Request Body')} value={data.request_body} />
         <JsonBlock title={t('Response Body')} value={data.response_body} />
 
@@ -354,6 +360,11 @@ export function ConversationContextDetail({
       </div>
 
       <MetaGrid context={data} />
+
+      <ConversationMessagesView
+        requestBody={data.request_body}
+        responseBody={data.response_body}
+      />
 
       <JsonBlock title={t('Request Body')} value={data.request_body} />
       <JsonBlock title={t('Response Body')} value={data.response_body} />

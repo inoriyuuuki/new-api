@@ -45,6 +45,10 @@ export const usageLogSchema = z.object({
   other: z.string().default(''),
   request_id: z.string().default(''),
   upstream_request_id: z.string().default(''),
+  // Whether a conversation context record exists for this log entry. The
+  // backend fills this in when a captured request/response is available;
+  // entries without a context must not show the "view context" entry.
+  has_context: z.boolean().default(false),
 })
 
 export type UsageLog = z.infer<typeof usageLogSchema>

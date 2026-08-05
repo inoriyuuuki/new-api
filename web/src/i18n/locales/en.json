@@ -5245,6 +5245,13 @@
     "Back to contexts": "Back to contexts",
     "Failed to load conversation context": "Failed to load conversation context",
     "Favorited At": "Favorited At",
-    "Source User": "Source User"
+    "Source User": "Source User",
+    "Assistant": "Assistant",
+    "Final Response": "Final Response",
+    "Function": "Function",
+    "Message List": "Message List",
+    "Messages": "Messages",
+    "Tool": "Tool",
+    "characters": "characters"
   }
 }

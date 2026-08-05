@@ -5245,6 +5245,13 @@
     "Back to contexts": "返回上下文",
     "Failed to load conversation context": "載入對話上下文失敗",
     "Favorited At": "收藏時間",
-    "Source User": "來源使用者"
+    "Source User": "來源使用者",
+    "Assistant": "助手",
+    "Final Response": "最終回覆",
+    "Function": "函式",
+    "Message List": "訊息列表",
+    "Messages": "訊息",
+    "Tool": "工具",
+    "characters": "字元"
   }
 }

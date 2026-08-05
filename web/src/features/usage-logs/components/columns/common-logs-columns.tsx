@@ -839,7 +839,9 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
       header: t('Context'),
       cell: ({ row }) => {
         const requestId = row.original.request_id
-        if (!requestId) return null
+        // Only logs that actually have a captured conversation context show
+        // the entry; logs without one must not render the button.
+        if (!requestId || !row.original.has_context) return null
         return (
           <Button
             variant='outline'

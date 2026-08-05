@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/glebarez/sqlite"
@@ -400,4 +401,52 @@ func favoriteRequestIDSet(ctx context.Context, userID int, items []*Conversation
 		set[fav.RequestID] = true
 	}
 	return set, nil
+}
+
+// markLogsHasContext batch-marks each log's HasContext by checking whether DB A
+// holds a conversation context for its request_id. It uses one deduplicated IN
+// query to avoid N+1 lookups and is strictly best-effort: a temporarily
+// unavailable context database only leaves flags false (and is logged), so the
+// usage log list keeps working even when DB A fails. Flags are always reset to
+// false first — before any DB A access — so reused Log objects never carry
+// stale values, even when DB A is nil or failing.
+func markLogsHasContext(logs []*Log) {
+	requestIDs := make([]string, 0, len(logs))
+	seen := make(map[string]struct{}, len(logs))
+	for _, log := range logs {
+		if log == nil {
+			continue
+		}
+		log.HasContext = false
+		if log.RequestId == "" {
+			continue
+		}
+		if _, dup := seen[log.RequestId]; dup {
+			continue
+		}
+		seen[log.RequestId] = struct{}{}
+		requestIDs = append(requestIDs, log.RequestId)
+	}
+	if CONVERSATION_DB == nil || len(requestIDs) == 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var found []string
+	err := CONVERSATION_DB.WithContext(ctx).Model(&ConversationContext{}).
+		Where("request_id IN ?", requestIDs).
+		Pluck("request_id", &found).Error
+	if err != nil {
+		common.SysLog("failed to mark log has_context: " + err.Error())
+		return
+	}
+	set := make(map[string]bool, len(found))
+	for _, requestID := range found {
+		set[requestID] = true
+	}
+	for _, log := range logs {
+		if log != nil {
+			log.HasContext = set[log.RequestId]
+		}
+	}
 }

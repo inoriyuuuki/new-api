@@ -5245,6 +5245,13 @@
     "Back to contexts": "Quay lại ngữ cảnh",
     "Failed to load conversation context": "Không thể tải ngữ cảnh hội thoại",
     "Favorited At": "Thời gian yêu thích",
-    "Source User": "Người dùng nguồn"
+    "Source User": "Người dùng nguồn",
+    "Assistant": "Trợ lý",
+    "Final Response": "Phản hồi cuối",
+    "Function": "Hàm",
+    "Message List": "Danh sách tin nhắn",
+    "Messages": "Tin nhắn",
+    "Tool": "Công cụ",
+    "characters": "ký tự"
   }
 }

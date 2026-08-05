@@ -79,6 +79,10 @@ type Log struct {
 	RequestId         string `json:"request_id,omitempty" gorm:"type:varchar(64);index:idx_logs_request_id;default:''"`
 	UpstreamRequestId string `json:"upstream_request_id,omitempty" gorm:"type:varchar(128);index:idx_logs_upstream_request_id;default:''"`
 	Other             string `json:"other"`
+	// HasContext reports whether a conversation context (DB A) exists for this
+	// request. It is computed at read time and never persisted to the logs
+	// table; false is always emitted explicitly in JSON.
+	HasContext bool `json:"has_context" gorm:"-"`
 }
 
 // don't use iota, avoid change log type value
@@ -577,6 +581,10 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 		}
 	}
 
+	// Best-effort: mark which logs have a conversation context in DB A. A DB A
+	// failure only leaves the flags false and never fails the log list.
+	markLogsHasContext(logs)
+
 	return logs, total, err
 }
 
@@ -627,6 +635,11 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 	}
 
 	formatUserLogs(logs, startIdx)
+
+	// Best-effort: mark which logs have a conversation context in DB A. A DB A
+	// failure only leaves the flags false and never fails the log list.
+	markLogsHasContext(logs)
+
 	return logs, total, err
 }
 

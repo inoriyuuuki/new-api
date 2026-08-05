@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -328,4 +329,191 @@ func TestDeleteOldConversationContextsByCreatedAt(t *testing.T) {
 	_, total, err := GetFavoriteConversationContexts(ctx, 1, "", 0, 100)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), total)
+}
+
+func TestMarkLogsHasContext(t *testing.T) {
+	setupConversationContextDB(t)
+	ctx := context.Background()
+
+	// Two contexts exist in DB A: one matches a log, one is an orphan.
+	require.NoError(t, UpsertConversationContext(ctx, &ConversationContext{
+		RequestID: "req-has-ctx",
+		UserID:    1,
+		CreatedAt: common.GetTimestamp(),
+	}))
+	require.NoError(t, UpsertConversationContext(ctx, &ConversationContext{
+		RequestID: "req-orphan",
+		UserID:    2,
+		CreatedAt: common.GetTimestamp(),
+	}))
+
+	// Stale values are pre-set on purpose: flags must be reset to false first,
+	// so a reused Log object can never keep an old true flag.
+	logs := []*Log{
+		{Id: 1, RequestId: "req-has-ctx", HasContext: true}, // exists -> true
+		{Id: 2, RequestId: "req-missing", HasContext: true}, // not exists -> reset to false
+		{Id: 3, RequestId: "", HasContext: true},            // empty id -> reset to false, no crash
+		{Id: 4, RequestId: "req-has-ctx"},                   // duplicate id -> true
+		{Id: 5},                                             // nil request id -> false
+	}
+	markLogsHasContext(logs)
+
+	require.Len(t, logs, 5)
+	assert.True(t, logs[0].HasContext, "existing request_id must be true")
+	assert.False(t, logs[1].HasContext, "missing request_id must be false")
+	assert.False(t, logs[2].HasContext, "empty request_id must be false")
+	assert.True(t, logs[3].HasContext, "duplicate request_id must also be true")
+	assert.False(t, logs[4].HasContext, "zero request_id must be false")
+
+	// Nil slice is a no-op.
+	markLogsHasContext(nil)
+}
+
+// TestMarkLogsHasContextClosedDB covers a real query error (closed SQLite
+// connection), not just a nil handle: the mark helper must not panic and must
+// leave every flag false (best-effort).
+func TestMarkLogsHasContextClosedDB(t *testing.T) {
+	saved := CONVERSATION_DB
+	t.Cleanup(func() { CONVERSATION_DB = saved })
+
+	ctxDB, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, ctxDB.AutoMigrate(&ConversationContext{}))
+	sqlDB, err := ctxDB.DB()
+	require.NoError(t, err)
+	require.NoError(t, sqlDB.Close())
+	CONVERSATION_DB = ctxDB
+
+	logs := []*Log{
+		{Id: 1, RequestId: "req-query-fail", HasContext: true}, // stale value must be reset
+		{Id: 2, RequestId: "req-query-fail"},
+	}
+	markLogsHasContext(logs)
+	require.Len(t, logs, 2)
+	assert.False(t, logs[0].HasContext, "query error must reset stale true to false")
+	assert.False(t, logs[1].HasContext)
+}
+
+// TestGetAllLogsSurvivesContextDBFailure verifies that a failing DB A does not
+// break the usage log list: logs are still returned successfully with all
+// has_context flags false.
+func TestGetAllLogsSurvivesContextDBFailure(t *testing.T) {
+	now := common.GetTimestamp()
+	log := &Log{UserId: 1, Username: "u1", CreatedAt: now, Type: LogTypeConsume, RequestId: "req-db-fail", Content: "x"}
+	require.NoError(t, LOG_DB.Create(log).Error)
+	t.Cleanup(func() {
+		LOG_DB.Where("request_id = ?", "req-db-fail").Delete(&Log{})
+	})
+
+	saved := CONVERSATION_DB
+	t.Cleanup(func() { CONVERSATION_DB = saved })
+	ctxDB, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, ctxDB.AutoMigrate(&ConversationContext{}))
+	sqlDB, err := ctxDB.DB()
+	require.NoError(t, err)
+	require.NoError(t, sqlDB.Close())
+	CONVERSATION_DB = ctxDB
+
+	logs, total, err := GetAllLogs(LogTypeConsume, 0, 0, "", "", "", 0, 10, 0, "", "", "")
+	require.NoError(t, err)
+	require.Equal(t, int64(1), total)
+	require.Len(t, logs, 1)
+	assert.False(t, logs[0].HasContext, "DB A failure must leave flags false without failing the list")
+}
+
+func TestMarkLogsHasContextNilDB(t *testing.T) {
+	saved := CONVERSATION_DB
+	CONVERSATION_DB = nil
+	t.Cleanup(func() { CONVERSATION_DB = saved })
+
+	// Stale true values must be reset to false even when DB A is nil: the
+	// reset pass runs before any DB A access.
+	logs := []*Log{
+		{Id: 1, RequestId: "req-any", HasContext: true},
+		{Id: 2, RequestId: "req-any", HasContext: true},
+	}
+	// Must not panic and must leave flags false when DB A is unavailable.
+	markLogsHasContext(logs)
+	assert.False(t, logs[0].HasContext, "stale true must be reset even with nil DB A")
+	assert.False(t, logs[1].HasContext)
+}
+
+func TestGetAllLogsMarksHasContext(t *testing.T) {
+	setupConversationContextDB(t)
+	ctx := context.Background()
+
+	now := common.GetTimestamp()
+	// Two consume logs: one has a context in DB A, the other does not.
+	logA := &Log{UserId: 1, Username: "u1", CreatedAt: now, Type: LogTypeConsume, RequestId: "req-all-logs-a", Content: "a"}
+	logB := &Log{UserId: 1, Username: "u1", CreatedAt: now, Type: LogTypeConsume, RequestId: "req-all-logs-b", Content: "b"}
+	require.NoError(t, LOG_DB.Create(logA).Error)
+	require.NoError(t, LOG_DB.Create(logB).Error)
+	require.NoError(t, UpsertConversationContext(ctx, &ConversationContext{
+		RequestID: "req-all-logs-a",
+		UserID:    1,
+		CreatedAt: now,
+	}))
+
+	logs, total, err := GetAllLogs(LogTypeConsume, 0, 0, "", "", "", 0, 10, 0, "", "", "")
+	require.NoError(t, err)
+	require.Equal(t, int64(2), total)
+	byID := map[string]*Log{}
+	for _, l := range logs {
+		byID[l.RequestId] = l
+	}
+	require.Contains(t, byID, "req-all-logs-a")
+	require.Contains(t, byID, "req-all-logs-b")
+	assert.True(t, byID["req-all-logs-a"].HasContext)
+	assert.False(t, byID["req-all-logs-b"].HasContext)
+
+	// HasContext must not be persisted: reloading from LOG_DB yields false.
+	var reloaded Log
+	require.NoError(t, LOG_DB.First(&reloaded, logA.Id).Error)
+	assert.False(t, reloaded.HasContext, "has_context must not be written to the logs table")
+}
+
+func TestGetUserLogsMarksHasContext(t *testing.T) {
+	setupConversationContextDB(t)
+	ctx := context.Background()
+
+	now := common.GetTimestamp()
+	logA := &Log{UserId: 1, Username: "u1", CreatedAt: now, Type: LogTypeConsume, RequestId: "req-user-logs-a", Content: "a"}
+	logB := &Log{UserId: 1, Username: "u1", CreatedAt: now, Type: LogTypeConsume, RequestId: "req-user-logs-b", Content: "b"}
+	require.NoError(t, LOG_DB.Create(logA).Error)
+	require.NoError(t, LOG_DB.Create(logB).Error)
+	require.NoError(t, UpsertConversationContext(ctx, &ConversationContext{
+		RequestID: "req-user-logs-b",
+		UserID:    1,
+		CreatedAt: now,
+	}))
+
+	logs, total, err := GetUserLogs(1, LogTypeConsume, 0, 0, "", "", 0, 10, "", "", "")
+	require.NoError(t, err)
+	require.Equal(t, int64(2), total)
+	byID := map[string]*Log{}
+	for _, l := range logs {
+		byID[l.RequestId] = l
+	}
+	require.Contains(t, byID, "req-user-logs-a")
+	require.Contains(t, byID, "req-user-logs-b")
+	assert.False(t, byID["req-user-logs-a"].HasContext)
+	assert.True(t, byID["req-user-logs-b"].HasContext)
+
+	// Non-conversation log types (manage/login) are always false.
+	manage := &Log{UserId: 1, Username: "u1", CreatedAt: now, Type: LogTypeManage, RequestId: "req-manage", Content: "m"}
+	require.NoError(t, LOG_DB.Create(manage).Error)
+	mlogs, mtotal, err := GetUserLogs(1, LogTypeManage, 0, 0, "", "", 0, 10, "", "", "")
+	require.NoError(t, err)
+	require.Equal(t, int64(1), mtotal)
+	require.Len(t, mlogs, 1)
+	assert.False(t, mlogs[0].HasContext)
+}
+
+func TestLogHasContextJSONExplicit(t *testing.T) {
+	data, err := json.Marshal(&Log{})
+	require.NoError(t, err)
+	// False must be emitted explicitly (no omitempty) so the frontend can rely
+	// on the field being present.
+	assert.Contains(t, string(data), `"has_context":false`)
 }

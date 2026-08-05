@@ -5245,6 +5245,13 @@
     "Back to contexts": "コンテキストに戻る",
     "Failed to load conversation context": "会話コンテキストの読み込みに失敗しました",
     "Favorited At": "お気に入り登録日時",
-    "Source User": "元ユーザー"
+    "Source User": "元ユーザー",
+    "Assistant": "アシスタント",
+    "Final Response": "最終応答",
+    "Function": "関数",
+    "Message List": "メッセージ一覧",
+    "Messages": "メッセージ",
+    "Tool": "ツール",
+    "characters": "文字"
   }
 }

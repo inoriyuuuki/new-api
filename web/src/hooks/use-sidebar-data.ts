@@ -27,7 +27,6 @@ import {
   ListTodo,
   MessageSquare,
   MessagesSquare,
-  Star,
   Radio,
   ServerCog,
   Settings,
@@ -95,12 +94,11 @@ export function useSidebarData(): SidebarData {
           {
             title: t('Conversation Contexts'),
             url: '/usage-logs/contexts',
+            activeUrls: [
+              '/usage-logs/contexts',
+              '/usage-logs/favorite-contexts',
+            ],
             icon: MessagesSquare,
-          },
-          {
-            title: t('Favorite Contexts'),
-            url: '/usage-logs/favorite-contexts',
-            icon: Star,
           },
           {
             title: t('Task Logs'),
