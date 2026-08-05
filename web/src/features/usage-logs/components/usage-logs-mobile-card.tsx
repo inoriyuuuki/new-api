@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Link } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { flexRender, type Cell, type Table } from '@tanstack/react-table'
 import { Database, Eye } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -316,6 +316,7 @@ function CommonLogsCard<TData>({
   cells: Map<string, Cell<TData, unknown>>
 }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
 
   const modelCell = cells.get('model_name')
   const quotaCell = cells.get('quota')
@@ -374,12 +375,12 @@ function CommonLogsCard<TData>({
             variant='outline'
             size='sm'
             className='h-7 gap-1.5'
-            render={
-              <Link
-                to='/usage-logs/context/$requestId'
-                params={{ requestId: rowData.request_id }}
-              />
-            }
+            onClick={() => {
+              void navigate({
+                to: '/usage-logs/context/$requestId',
+                params: { requestId: rowData.request_id },
+              })
+            }}
           >
             <Eye className='size-3.5' />
             {t('View Context')}

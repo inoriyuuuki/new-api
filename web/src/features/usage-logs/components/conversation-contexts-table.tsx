@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { getRouteApi, Link } from '@tanstack/react-router'
+import { getRouteApi, useNavigate } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Eye, Search } from 'lucide-react'
 import { useMemo } from 'react'
@@ -50,7 +50,8 @@ const route = getRouteApi('/_authenticated/usage-logs/$section')
 
 function buildContextColumns(
   t: (key: string) => string,
-  isAdminView: boolean
+  isAdminView: boolean,
+  navigate: ReturnType<typeof useNavigate>
 ): ColumnDef<ConversationContext>[] {
   const columns: ColumnDef<ConversationContext>[] = [
     {
@@ -156,9 +157,12 @@ function buildContextColumns(
           variant='outline'
           size='sm'
           className='h-7 gap-1.5'
-          render={
-            <Link to='/usage-logs/context/$requestId' params={{ requestId }} />
-          }
+          onClick={() => {
+            void navigate({
+              to: '/usage-logs/context/$requestId',
+              params: { requestId },
+            })
+          }}
         >
           <Eye className='size-3.5' />
           {t('View Context')}
@@ -174,6 +178,7 @@ function buildContextColumns(
 
 export function ConversationContextsTable() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { isAdminView } = useLogsViewScope()
   const currentUserId = useAuthStore((state) => state.auth.user?.id)
   const isMobile = useMediaQuery('(max-width: 640px)')
@@ -217,8 +222,8 @@ export function ConversationContextsTable() {
     [data]
   )
   const columns = useMemo(
-    () => buildContextColumns(t, isAdminView),
-    [t, isAdminView]
+    () => buildContextColumns(t, isAdminView, navigate),
+    [t, isAdminView, navigate]
   )
 
   const { table } = useDataTable({

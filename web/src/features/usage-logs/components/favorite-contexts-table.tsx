@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { getRouteApi, Link } from '@tanstack/react-router'
+import { getRouteApi, useNavigate } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Eye, Search, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -50,7 +50,8 @@ const route = getRouteApi('/_authenticated/usage-logs/$section')
 
 function buildFavoriteColumns(
   t: (key: string) => string,
-  onDelete: (favorite: FavoriteConversationContext) => void
+  onDelete: (favorite: FavoriteConversationContext) => void,
+  navigate: ReturnType<typeof useNavigate>
 ): ColumnDef<FavoriteConversationContext>[] {
   return [
     {
@@ -116,12 +117,12 @@ function buildFavoriteColumns(
                 variant='outline'
                 size='sm'
                 className='h-7 gap-1.5'
-                render={
-                  <Link
-                    to='/usage-logs/favorite-context/$id'
-                    params={{ id: String(favorite.id) }}
-                  />
-                }
+                onClick={() => {
+                  void navigate({
+                    to: '/usage-logs/favorite-context/$id',
+                    params: { id: String(favorite.id) },
+                  })
+                }}
               >
                 <Eye className='size-3.5' />
                 {t('View')}
@@ -148,6 +149,7 @@ function buildFavoriteColumns(
 export function FavoriteContextsTable() {
   const { t } = useTranslation()
   const isMobile = useMediaQuery('(max-width: 640px)')
+  const navigate = useNavigate()
   const [deleteTarget, setDeleteTarget] =
     useState<FavoriteConversationContext | null>(null)
   const deleteMutation = useDeleteFavoriteContext()
@@ -196,8 +198,8 @@ export function FavoriteContextsTable() {
   )
 
   const columns = useMemo(
-    () => buildFavoriteColumns(t, handleDelete),
-    [t, handleDelete]
+    () => buildFavoriteColumns(t, handleDelete, navigate),
+    [t, handleDelete, navigate]
   )
 
   const { table } = useDataTable({

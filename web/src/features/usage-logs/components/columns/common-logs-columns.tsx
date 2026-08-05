@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Link } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Eye, GitBranch, Sparkles, KeyRound } from 'lucide-react'
 import { useState } from 'react'
@@ -292,6 +292,7 @@ function buildTypeDetailSegments(
 
 export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const columns: ColumnDef<UsageLog>[] = [
     {
       accessorKey: 'created_at',
@@ -844,12 +845,12 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
             variant='outline'
             size='sm'
             className='h-7 gap-1.5'
-            render={
-              <Link
-                to='/usage-logs/context/$requestId'
-                params={{ requestId }}
-              />
-            }
+            onClick={() => {
+              void navigate({
+                to: '/usage-logs/context/$requestId',
+                params: { requestId },
+              })
+            }}
           >
             <Eye className='size-3.5' />
             {t('View Context')}
