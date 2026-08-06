@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 
+	kitutil "github.com/QuantumNous/new-api/relaykit/relayconvert/kitutil"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -102,7 +104,7 @@ func MaskRequestURL(u *url.URL) string {
 	if scheme == "" {
 		scheme = "http"
 	}
-	host := maskHostForURL(u.Hostname())
+	host := kitutil.MaskHostForURL(u.Hostname())
 	if host == "" {
 		host = "***"
 	}
