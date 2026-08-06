@@ -3775,6 +3775,7 @@
     "Request Model": "請求模型",
     "Request Model:": "請求模型：",
     "Request overrides, routing behavior, and upstream model automation": "請求覆蓋、路由行為和上游模型自動化",
+    "Request Parameters": "請求參數",
     "Request retry": "請求重試",
     "Request rule pricing": "請求規則收費",
     "Request success rate sampled over the last 24 hours": "最近 24 小時按時間桶採樣的請求成功率",

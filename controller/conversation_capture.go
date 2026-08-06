@@ -451,11 +451,12 @@ func (cap *conversationCapture) buildRecord(c *gin.Context) *model.ConversationC
 		RequestPath:    requestPath,
 		RelayFormat:    string(cap.relayFormat),
 		ModelName:      cap.resolveModelName(c),
-		RequestBody:    cap.requestBody,
+		RequestBody:    string(common.MaskJSONSensitiveValues([]byte(cap.requestBody))),
 		ResponseBody:   responseBody,
 		ResponseStatus: status,
 		IsStream:       cap.resolveIsStream(c),
 		CaptureStatus:  cap.resolveStatus(),
+		RequestMeta:    common.BuildRequestMeta(c),
 	}
 }
 

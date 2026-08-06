@@ -85,6 +85,7 @@ func FavoriteConversationContext(c *gin.Context) {
 		ResponseStatus: record.ResponseStatus,
 		IsStream:       record.IsStream,
 		CaptureStatus:  record.CaptureStatus,
+		RequestMeta:    model.FavoriteRequestMeta(record.RequestMeta),
 	}
 	if err := model.CreateFavoriteConversationContext(c, fav); err != nil {
 		common.ApiError(c, err)

@@ -3775,6 +3775,7 @@
     "Request Model": "リクエストモデル",
     "Request Model:": "リクエストモデル：",
     "Request overrides, routing behavior, and upstream model automation": "リクエスト上書き、ルーティング動作、上流モデル自動化",
+    "Request Parameters": "リクエストパラメータ",
     "Request retry": "リクエスト再試行",
     "Request rule pricing": "リクエストルールの課金",
     "Request success rate sampled over the last 24 hours": "過去 24 時間にサンプリングされたリクエスト成功率",

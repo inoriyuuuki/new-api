@@ -305,6 +305,8 @@ export function ConversationContextDetail({
 
         <MetaGrid context={data} />
 
+        <JsonBlock title={t('Request Parameters')} value={data.request_meta} />
+
         <ConversationMessagesView
           requestBody={data.request_body}
           responseBody={data.response_body}
@@ -360,6 +362,8 @@ export function ConversationContextDetail({
       </div>
 
       <MetaGrid context={data} />
+
+      <JsonBlock title={t('Request Parameters')} value={data.request_meta} />
 
       <ConversationMessagesView
         requestBody={data.request_body}

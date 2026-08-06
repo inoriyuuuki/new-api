@@ -63,6 +63,7 @@ func seedConversationContext(t *testing.T, requestID string, userID int) {
 		RequestBody:   `{"model":"deepseek-v4-flash"}`,
 		ResponseBody:  `{"choices":[]}`,
 		CaptureStatus: "completed",
+		RequestMeta:   `{"method":"POST","url":"/v1/chat/completions"}`,
 	}))
 }
 
@@ -206,6 +207,7 @@ func TestFavoriteConversationContextDetailSurvivesContextCleanup(t *testing.T) {
 	require.NoError(t, json.Unmarshal(env.Data, &favorite))
 	assert.Equal(t, "req-survives-cleanup", favorite.RequestID)
 	assert.Equal(t, model.FavoriteConversationPayload(`{"model":"deepseek-v4-flash"}`), favorite.RequestBody)
+	assert.Equal(t, model.FavoriteRequestMeta(`{"method":"POST","url":"/v1/chat/completions"}`), favorite.RequestMeta)
 }
 
 func TestFavoriteConversationContextListDeleteScoped(t *testing.T) {

@@ -96,8 +96,10 @@ func TestNewConversationCaptureSkipsNonConversation(t *testing.T) {
 }
 
 func TestCapturePlainJSON(t *testing.T) {
-	reqBody := `{"model":"gpt-4o","messages":[{"role":"user","content":"hi"}]}`
-	c, rec := newCaptureTestContext(http.MethodPost, "/v1/chat/completions", reqBody, "application/json")
+	reqBody := `{"model":"gpt-4o","api_key":"sk-secret","messages":[{"role":"user","content":"hi"}]}`
+	c, rec := newCaptureTestContext(http.MethodPost, "/v1/chat/completions?api_key=sk-query-secret", reqBody, "application/json")
+	c.Request.Header.Set("Authorization", "Bearer sk-header-secret")
+	c.Request.Header.Set("X-Goog-Api-Key", "AIzaSyAAAaUooTUni8AdaOkSRMda30n_Q4vrV70")
 	capture := newConversationCapture(c, types.RelayFormatOpenAI)
 	require.NotNil(t, capture)
 
@@ -116,8 +118,17 @@ func TestCapturePlainJSON(t *testing.T) {
 	assert.Equal(t, "gpt-4o", record.ModelName)
 	assert.Equal(t, "/v1/chat/completions", record.RequestPath)
 	assert.Equal(t, string(types.RelayFormatOpenAI), record.RelayFormat)
-	assert.Equal(t, reqBody, record.RequestBody)
+	assert.Equal(t, `{"api_key":"***","messages":[{"content":"hi","role":"user"}],"model":"gpt-4o"}`, record.RequestBody)
 	assert.Equal(t, `{"id":"chatcmpl-1","choices":[]}`, record.ResponseBody)
+	require.NotEmpty(t, record.RequestMeta)
+	assert.Contains(t, record.RequestMeta, `"method":"POST"`)
+	assert.Contains(t, record.RequestMeta, `"url":"http://***/v1/chat/completions?api_key=***"`)
+	assert.Contains(t, record.RequestMeta, `"Authorization":"***"`)
+	assert.Contains(t, record.RequestMeta, `"X-Goog-Api-Key":"***"`)
+	assert.NotContains(t, record.RequestMeta, "sk-secret")
+	assert.NotContains(t, record.RequestMeta, "sk-query-secret")
+	assert.NotContains(t, record.RequestMeta, "sk-header-secret")
+	assert.NotContains(t, record.RequestMeta, "AIzaSyAAAaUooTUni8AdaOkSRMda30n_Q4vrV70")
 	assert.Equal(t, http.StatusOK, record.ResponseStatus)
 	assert.False(t, record.IsStream)
 	assert.Equal(t, captureStatusComplete, record.CaptureStatus)
@@ -125,6 +136,24 @@ func TestCapturePlainJSON(t *testing.T) {
 	// Passthrough: the client received the exact same bytes and status.
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, `{"id":"chatcmpl-1","choices":[]}`, rec.Body.String())
+	capture.cleanup()
+}
+
+func TestCaptureTruncatedJSONBodyNotPersisted(t *testing.T) {
+	// A request body cut at the capture limit is invalid JSON; the raw
+	// prefix must never be written to the conversation context.
+	reqBody := `{"model":"gpt-4o","api_key":"sk-secret","messages":[]}`
+	truncated := reqBody[:20]
+	c, _ := newCaptureTestContext(http.MethodPost, "/v1/chat/completions", truncated, "application/json")
+	capture := newConversationCapture(c, types.RelayFormatOpenAI)
+	require.NotNil(t, capture)
+	capture.readRequestBody(c)
+
+	record := capture.buildRecord(c)
+	require.NotNil(t, record)
+	assert.Equal(t, "", record.RequestBody)
+	require.NotEmpty(t, record.RequestMeta)
+	assert.NotContains(t, record.RequestMeta, "sk-secret")
 	capture.cleanup()
 }
 

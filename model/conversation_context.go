@@ -34,6 +34,10 @@ type ConversationContext struct {
 	ResponseStatus int    `json:"response_status"`
 	IsStream       bool   `json:"is_stream"`
 	CaptureStatus  string `gorm:"type:varchar(32)" json:"capture_status"`
+	// RequestMeta is a single masked snapshot of the inbound HTTP parameters
+	// (method, path with query parameters, headers). Sensitive values are
+	// redacted before persistence; see common.BuildRequestMeta.
+	RequestMeta string `gorm:"type:text" json:"request_meta"`
 	// IsFavorite is computed at read time from DB B and never persisted.
 	IsFavorite bool `gorm:"-" json:"is_favorite"`
 }
@@ -48,6 +52,22 @@ func (FavoriteConversationPayload) GormDataType() string {
 }
 
 func (FavoriteConversationPayload) GormDBDataType(db *gorm.DB, _ *schema.Field) string {
+	if db != nil && db.Dialector.Name() == "mysql" {
+		return "LONGTEXT"
+	}
+	return "TEXT"
+}
+
+// FavoriteRequestMeta stores the masked request metadata snapshot in DB B.
+// MySQL's plain TEXT is limited to 64KB; request metadata includes every
+// inbound header, so favorites use LONGTEXT there just like the payloads.
+type FavoriteRequestMeta string
+
+func (FavoriteRequestMeta) GormDataType() string {
+	return "text"
+}
+
+func (FavoriteRequestMeta) GormDBDataType(db *gorm.DB, _ *schema.Field) string {
 	if db != nil && db.Dialector.Name() == "mysql" {
 		return "LONGTEXT"
 	}
@@ -73,6 +93,7 @@ type FavoriteConversationContext struct {
 	ResponseStatus int                         `json:"response_status"`
 	IsStream       bool                        `json:"is_stream"`
 	CaptureStatus  string                      `gorm:"type:varchar(32)" json:"capture_status"`
+	RequestMeta    FavoriteRequestMeta         `json:"request_meta"`
 	IsFavorite     bool                        `gorm:"-" json:"is_favorite"`
 }
 
@@ -201,6 +222,7 @@ func UpsertConversationContext(ctx context.Context, record *ConversationContext)
 		"response_status": record.ResponseStatus,
 		"is_stream":       record.IsStream,
 		"capture_status":  record.CaptureStatus,
+		"request_meta":    record.RequestMeta,
 	}
 	return CONVERSATION_DB.WithContext(ctx).Model(&ConversationContext{}).
 		Where("id = ?", existing.ID).Updates(updates).Error
