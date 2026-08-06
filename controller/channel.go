@@ -612,6 +612,9 @@ func AddChannel(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	// A channel can only be bound to a credential profile through the profile
+	// binding endpoints; a create request must never set the reference.
+	addChannelRequest.Channel.CredentialProfileId = nil
 
 	// 使用统一的校验函数
 	if err := validateChannel(addChannelRequest.Channel, true); err != nil {
@@ -1002,80 +1005,17 @@ func UpdateChannel(c *gin.Context) {
 	// 处理多key模式下的密钥追加/覆盖逻辑
 	if channel.KeyMode != nil && channel.ChannelInfo.IsMultiKey {
 		switch *channel.KeyMode {
-		case "append":
-			// 追加模式：将新密钥添加到现有密钥列表
-			if originChannel.Key != "" {
-				var newKeys []string
-				var existingKeys []string
-
-				// 解析现有密钥
-				if strings.HasPrefix(strings.TrimSpace(originChannel.Key), "[") {
-					// JSON数组格式
-					var arr []json.RawMessage
-					if err := json.Unmarshal([]byte(strings.TrimSpace(originChannel.Key)), &arr); err == nil {
-						existingKeys = make([]string, len(arr))
-						for i, v := range arr {
-							existingKeys[i] = string(v)
-						}
-					}
-				} else {
-					// 换行分隔格式
-					existingKeys = strings.Split(strings.Trim(originChannel.Key, "\n"), "\n")
-				}
-
-				// 处理 Vertex AI 的特殊情况
-				if channel.Type == constant.ChannelTypeVertexAi && channel.GetOtherSettings().VertexKeyType != dto.VertexKeyTypeAPIKey {
-					// 尝试解析新密钥为JSON数组
-					if strings.HasPrefix(strings.TrimSpace(channel.Key), "[") {
-						array, err := getVertexArrayKeys(channel.Key)
-						if err != nil {
-							c.JSON(http.StatusOK, gin.H{
-								"success": false,
-								"message": "追加密钥解析失败: " + err.Error(),
-							})
-							return
-						}
-						newKeys = array
-					} else {
-						// 单个JSON密钥
-						newKeys = []string{channel.Key}
-					}
-				} else {
-					// 普通渠道的处理
-					inputKeys := strings.Split(channel.Key, "\n")
-					for _, key := range inputKeys {
-						key = strings.TrimSpace(key)
-						if key != "" {
-							newKeys = append(newKeys, key)
-						}
-					}
-				}
-
-				seen := make(map[string]struct{}, len(existingKeys)+len(newKeys))
-				for _, key := range existingKeys {
-					normalized := strings.TrimSpace(key)
-					if normalized == "" {
-						continue
-					}
-					seen[normalized] = struct{}{}
-				}
-				dedupedNewKeys := make([]string, 0, len(newKeys))
-				for _, key := range newKeys {
-					normalized := strings.TrimSpace(key)
-					if normalized == "" {
-						continue
-					}
-					if _, ok := seen[normalized]; ok {
-						continue
-					}
-					seen[normalized] = struct{}{}
-					dedupedNewKeys = append(dedupedNewKeys, normalized)
-				}
-
-				allKeys := append(existingKeys, dedupedNewKeys...)
-				channel.Key = strings.Join(allKeys, "\n")
+		case credentialKeyModeAppend:
+			mergedKey, err := mergeChannelKeys(originChannel.Key, channel.Key, true, credentialKeyModeAppend, channel.Type, channel.GetOtherSettings().VertexKeyType)
+			if err != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"message": "追加密钥解析失败: " + err.Error(),
+				})
+				return
 			}
-		case "replace":
+			channel.Key = mergedKey
+		case credentialKeyModeReplace:
 			// 覆盖模式：直接使用新密钥（默认行为，不需要特殊处理）
 		}
 	}
@@ -1424,6 +1364,9 @@ func CopyChannel(c *gin.Context) {
 	// clone channel
 	clone := *origin // shallow copy is sufficient as we will overwrite primitives
 	clone.Id = 0     // let DB auto-generate
+	// A copied channel must opt into a credential profile explicitly; it never
+	// inherits the source's binding.
+	clone.CredentialProfileId = nil
 	clone.CreatedTime = common.GetTimestamp()
 	clone.Name = origin.Name + suffix
 	clone.TestTime = 0

@@ -17,17 +17,24 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
+import { getRouteApi, Link, useNavigate } from '@tanstack/react-router'
 import { Settings2 } from 'lucide-react'
+import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SectionPageLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  ADMIN_PERMISSION_ACTIONS,
+  ADMIN_PERMISSION_RESOURCES,
+  hasPermission,
+} from '@/lib/admin-permissions'
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -36,12 +43,42 @@ import { ChannelsDialogs } from './components/channels-dialogs'
 import { ChannelsPrimaryButtons } from './components/channels-primary-buttons'
 import { ChannelsProvider } from './components/channels-provider'
 import { ChannelsTable } from './components/channels-table'
+import { CredentialProfilesPanel } from './credential-profiles/components/credential-profiles-panel'
+import {
+  type ChannelsSectionId,
+  CHANNELS_DEFAULT_SECTION,
+  CHANNELS_CREDENTIAL_PROFILES_SECTION,
+  CHANNELS_SECTION_IDS,
+} from './section-registry'
+
+const route = getRouteApi('/_authenticated/channels/$section')
+
+const CHANNELS_SECTION_META: Record<ChannelsSectionId, { titleKey: string }> = {
+  list: {
+    titleKey: 'Channels',
+  },
+  'credential-profiles': {
+    titleKey: 'Credential Profiles',
+  },
+}
 
 export function Channels() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
+  const params = route.useParams()
+  const activeSection = (params.section ??
+    CHANNELS_DEFAULT_SECTION) as ChannelsSectionId
+
   const isRoot = useAuthStore(
     (state) => state.auth.user?.role === ROLE.SUPER_ADMIN
   )
+  const currentUser = useAuthStore((s) => s.auth.user)
+  const canSensitiveWrite = hasPermission(
+    currentUser,
+    ADMIN_PERMISSION_RESOURCES.CHANNEL,
+    ADMIN_PERMISSION_ACTIONS.SENSITIVE_WRITE
+  )
+
   const channelOpsQuery = useQuery({
     queryKey: ['channel-ops'],
     queryFn: getChannelOps,
@@ -84,20 +121,56 @@ export function Channels() {
     )
   }
 
+  const handleSectionChange = useCallback(
+    (section: string) => {
+      void navigate({
+        to: '/channels/$section',
+        params: { section: section as ChannelsSectionId },
+        search: true,
+      })
+    },
+    [navigate]
+  )
+
+  const meta =
+    CHANNELS_SECTION_META[activeSection] ?? CHANNELS_SECTION_META.list
+
+  let sectionContent = null
+  if (activeSection === 'list') {
+    sectionContent = <ChannelsTable />
+  } else if (canSensitiveWrite) {
+    sectionContent = <CredentialProfilesPanel />
+  }
+
   return (
     <ChannelsProvider>
       <SectionPageLayout fixedContent>
         <SectionPageLayout.Title>
           <span className='flex min-w-0 items-center gap-2'>
-            <span className='truncate'>{t('Channels')}</span>
-            {retryBadge}
+            <span className='truncate'>{t(meta.titleKey)}</span>
+            {activeSection === 'list' ? retryBadge : null}
           </span>
         </SectionPageLayout.Title>
         <SectionPageLayout.Actions>
-          <ChannelsPrimaryButtons />
+          {activeSection === 'list' ? <ChannelsPrimaryButtons /> : null}
         </SectionPageLayout.Actions>
         <SectionPageLayout.Content>
-          <ChannelsTable />
+          <div className='flex h-full min-h-0 flex-col gap-4'>
+            <Tabs value={activeSection} onValueChange={handleSectionChange}>
+              <TabsList className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'>
+                {CHANNELS_SECTION_IDS.filter(
+                  (section) =>
+                    section !== CHANNELS_CREDENTIAL_PROFILES_SECTION ||
+                    canSensitiveWrite
+                ).map((section) => (
+                  <TabsTrigger key={section} value={section}>
+                    {t(CHANNELS_SECTION_META[section].titleKey)}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+            <div className='min-h-0 flex-1'>{sectionContent}</div>
+          </div>
         </SectionPageLayout.Content>
       </SectionPageLayout>
 

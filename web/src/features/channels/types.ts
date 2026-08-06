@@ -71,6 +71,7 @@ export const channelSchema = z.object({
     multi_key_mode: 'random',
   }),
   settings: z.string().default('{}'), // other_settings JSON
+  credential_profile_id: z.number().nullish(),
 })
 
 export type Channel = z.infer<typeof channelSchema>

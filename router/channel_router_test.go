@@ -27,6 +27,21 @@ func TestChannelDeleteRoutesUseSensitiveWritePermission(t *testing.T) {
 	assertChannelRoutePermission(t, http.MethodPost, "/batch/tag", authz.ChannelWrite, controller.BatchSetChannelTag)
 }
 
+func TestChannelCredentialRefreshUsesSensitiveWritePermission(t *testing.T) {
+	assertChannelRoutePermission(t, http.MethodPost, "/credential-refresh", authz.ChannelSensitiveWrite, controller.RefreshChannelCredentials)
+}
+
+func TestCredentialProfileRoutesUseCorrectPermissions(t *testing.T) {
+	assertChannelRoutePermission(t, http.MethodGet, "/credential-profiles", authz.ChannelRead, controller.GetCredentialProfiles)
+	assertChannelRoutePermission(t, http.MethodGet, "/credential-profiles/:id", authz.ChannelRead, controller.GetCredentialProfile)
+	assertChannelRoutePermission(t, http.MethodGet, "/credential-profiles/:id/channels", authz.ChannelRead, controller.GetCredentialProfileChannels)
+	assertChannelRoutePermission(t, http.MethodPost, "/credential-profiles", authz.ChannelSensitiveWrite, controller.CreateCredentialProfile)
+	assertChannelRoutePermission(t, http.MethodPut, "/credential-profiles/:id", authz.ChannelSensitiveWrite, controller.UpdateCredentialProfile)
+	assertChannelRoutePermission(t, http.MethodDelete, "/credential-profiles/:id", authz.ChannelSensitiveWrite, controller.DeleteCredentialProfile)
+	assertChannelRoutePermission(t, http.MethodPut, "/credential-profiles/:id/channels", authz.ChannelSensitiveWrite, controller.SetCredentialProfileChannels)
+	assertChannelRoutePermission(t, http.MethodPost, "/credential-profiles/:id/apply", authz.ChannelSensitiveWrite, controller.ApplyCredentialProfile)
+}
+
 func TestChannelStatusRoutesRegisterWithoutConflict(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()

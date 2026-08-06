@@ -132,6 +132,11 @@ export function useSidebarData(): SidebarData {
           {
             title: t('Channels'),
             url: '/channels',
+            activeUrls: [
+              '/channels',
+              '/channels/list',
+              '/channels/credential-profiles',
+            ],
             icon: Radio,
           },
           {

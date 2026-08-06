@@ -17,21 +17,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, redirect } from '@tanstack/react-router'
-import z from 'zod'
 
-import { Channels } from '@/features/channels'
+import { CHANNELS_DEFAULT_SECTION } from '@/features/channels/section-registry'
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
-
-const channelsSearchSchema = z.object({
-  page: z.number().optional().catch(1),
-  pageSize: z.number().optional().catch(undefined),
-  filter: z.string().optional().catch(''),
-  status: z.array(z.string()).optional().catch([]),
-  type: z.array(z.string()).optional().catch([]),
-  group: z.array(z.string()).optional().catch([]),
-  model: z.string().optional().catch(''),
-})
 
 export const Route = createFileRoute('/_authenticated/channels/')({
   beforeLoad: () => {
@@ -42,7 +31,11 @@ export const Route = createFileRoute('/_authenticated/channels/')({
         to: '/403',
       })
     }
+
+    throw redirect({
+      to: '/channels/$section',
+      params: { section: CHANNELS_DEFAULT_SECTION },
+      search: true,
+    })
   },
-  validateSearch: channelsSearchSchema,
-  component: Channels,
 })

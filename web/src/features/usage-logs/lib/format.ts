@@ -357,6 +357,22 @@ const AUDIT_TEMPLATES: Record<string, string> = {
     'Applied upstream model changes to channel (ID: {{id}})',
   'channel.upstream_apply_all':
     'Applied upstream model changes to {{count}} channels',
+  'channel.credential_refresh':
+    'Refreshed credentials for {{succeeded}}/{{total}} channels with tag {{tag}}',
+  'channel.credential_refresh_preview':
+    'Previewed credential refresh for {{succeeded}}/{{total}} channels with tag {{tag}}',
+  'channel.credential_profile_create':
+    'Created credential profile {{name}} (ID: {{id}})',
+  'channel.credential_profile_update':
+    'Updated credential profile {{name}} (ID: {{id}})',
+  'channel.credential_profile_delete':
+    'Deleted credential profile {{name}} (ID: {{id}})',
+  'channel.credential_profile_bind':
+    'Updated bound channels of credential profile {{name}} (ID: {{id}})',
+  'channel.credential_profile_apply':
+    'Applied credential profile {{name}} (ID: {{id}}): {{succeeded}}/{{total}} channels, {{synced}} updated',
+  'channel.credential_profile_preview':
+    'Previewed credential profile {{name}} (ID: {{id}}): {{succeeded}}/{{total}} channels, {{synced}} to update',
   // Redemption codes
   'redemption.create':
     'Created {{count}} redemption codes named {{name}} ({{quota}} each)',

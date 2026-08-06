@@ -50,6 +50,10 @@ type Channel struct {
 	ParamOverride     *string `json:"param_override" gorm:"type:text"`
 	HeaderOverride    *string `json:"header_override" gorm:"type:text"`
 	Remark            *string `json:"remark" gorm:"type:varchar(255)" validate:"max=255"`
+	// CredentialProfileId references a ChannelCredentialProfile whose
+	// key/base_url are materialized onto this channel by the profile apply
+	// endpoint. The relay never reads this column; it only reads Key/BaseURL.
+	CredentialProfileId *int `json:"credential_profile_id" gorm:"index"`
 	// add after v0.8.5
 	ChannelInfo ChannelInfo `json:"channel_info" gorm:"type:json"`
 
