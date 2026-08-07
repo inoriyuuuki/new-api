@@ -457,7 +457,22 @@ func (cap *conversationCapture) buildRecord(c *gin.Context) *model.ConversationC
 		IsStream:       cap.resolveIsStream(c),
 		CaptureStatus:  cap.resolveStatus(),
 		RequestMeta:    common.BuildRequestMeta(c),
+		StreamStatus:   cap.buildStreamStatus(),
 	}
+}
+
+// buildStreamStatus snapshots the relay stream end state (mirroring the usage
+// log's other.stream_status) so it can be inspected from the conversation
+// context. Empty for non-stream calls or when the relay never started.
+func (cap *conversationCapture) buildStreamStatus() string {
+	if cap.relayInfo == nil || cap.relayInfo.StreamStatus == nil || !cap.relayInfo.IsStream {
+		return ""
+	}
+	data, err := common.Marshal(cap.relayInfo.StreamStatus.ToMap())
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }
 
 func (cap *conversationCapture) resolveModelName(c *gin.Context) string {

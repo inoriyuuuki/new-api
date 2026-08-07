@@ -180,3 +180,93 @@ func TestStreamStatus_Summary_NilSafe(t *testing.T) {
 	var s *StreamStatus
 	assert.Equal(t, "StreamStatus<nil>", s.Summary())
 }
+
+func TestStreamStatus_ToMap(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil safe", func(t *testing.T) {
+		var s *StreamStatus
+		assert.Empty(t, s.ToMap())
+	})
+
+	t.Run("normal end", func(t *testing.T) {
+		s := NewStreamStatus()
+		s.SetEndReason(StreamEndReasonDone, nil)
+		got := s.ToMap()
+		assert.Equal(t, "ok", got["status"])
+		assert.Equal(t, string(StreamEndReasonDone), got["end_reason"])
+		assert.NotContains(t, got, "end_error")
+		assert.NotContains(t, got, "error_count")
+		assert.NotContains(t, got, "errors")
+	})
+
+	t.Run("abnormal end with error", func(t *testing.T) {
+		s := NewStreamStatus()
+		s.SetEndReason(StreamEndReasonClientGone, fmt.Errorf("context canceled"))
+		got := s.ToMap()
+		assert.Equal(t, "error", got["status"])
+		assert.Equal(t, string(StreamEndReasonClientGone), got["end_reason"])
+		assert.Equal(t, "context canceled", got["end_error"])
+	})
+
+	t.Run("soft errors", func(t *testing.T) {
+		s := NewStreamStatus()
+		s.SetEndReason(StreamEndReasonDone, nil)
+		s.RecordError("bad json")
+		s.RecordError("write failed")
+		got := s.ToMap()
+		assert.Equal(t, "error", got["status"], "soft errors must flip status to error")
+		assert.Equal(t, 2, got["error_count"])
+		assert.Equal(t, []string{"bad json", "write failed"}, got["errors"])
+	})
+}
+
+func TestStreamStatus_Completed(t *testing.T) {
+	t.Parallel()
+
+	s := NewStreamStatus()
+	assert.False(t, s.IsCompleted())
+	s.MarkCompleted()
+	assert.True(t, s.IsCompleted())
+
+	var nilStatus *StreamStatus
+	nilStatus.MarkCompleted()
+	assert.False(t, nilStatus.IsCompleted())
+}
+
+func TestStreamStatus_ToMap_ClientGoneWarning(t *testing.T) {
+	t.Parallel()
+
+	t.Run("client gone after terminal event is warning", func(t *testing.T) {
+		s := NewStreamStatus()
+		s.MarkCompleted()
+		s.SetEndReason(StreamEndReasonClientGone, fmt.Errorf("context canceled"))
+		got := s.ToMap()
+		assert.Equal(t, "warning", got["status"])
+		assert.Equal(t, string(StreamEndReasonClientGone), got["end_reason"])
+		assert.Equal(t, "context canceled", got["end_error"])
+	})
+
+	t.Run("client gone without terminal event stays error", func(t *testing.T) {
+		s := NewStreamStatus()
+		s.SetEndReason(StreamEndReasonClientGone, fmt.Errorf("context canceled"))
+		got := s.ToMap()
+		assert.Equal(t, "error", got["status"])
+	})
+
+	t.Run("terminal event alone stays ok", func(t *testing.T) {
+		s := NewStreamStatus()
+		s.MarkCompleted()
+		s.SetEndReason(StreamEndReasonEOF, nil)
+		got := s.ToMap()
+		assert.Equal(t, "ok", got["status"])
+	})
+
+	t.Run("other abnormal ends stay error even when completed", func(t *testing.T) {
+		s := NewStreamStatus()
+		s.MarkCompleted()
+		s.SetEndReason(StreamEndReasonScannerErr, fmt.Errorf("response body closed"))
+		got := s.ToMap()
+		assert.Equal(t, "error", got["status"])
+	})
+}

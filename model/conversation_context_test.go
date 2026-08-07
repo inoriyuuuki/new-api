@@ -52,6 +52,7 @@ func TestUpsertConversationContextIdempotent(t *testing.T) {
 	setupConversationContextDB(t)
 	ctx := context.Background()
 
+	streamStatus := `{"status":"error","end_reason":"client_gone","end_error":"context canceled"}`
 	record := &ConversationContext{
 		RequestID:      "req-idem",
 		UserID:         1,
@@ -64,6 +65,7 @@ func TestUpsertConversationContextIdempotent(t *testing.T) {
 		ResponseStatus: 200,
 		IsStream:       false,
 		CaptureStatus:  "completed",
+		StreamStatus:   streamStatus,
 	}
 	require.NoError(t, UpsertConversationContext(ctx, record))
 	require.NoError(t, UpsertConversationContext(ctx, record))
@@ -71,6 +73,11 @@ func TestUpsertConversationContextIdempotent(t *testing.T) {
 	var total int64
 	require.NoError(t, CONVERSATION_DB.Model(&ConversationContext{}).Where("request_id = ?", "req-idem").Count(&total).Error)
 	assert.Equal(t, int64(1), total)
+
+	// The stream status snapshot survives the upsert round-trip.
+	got, err := GetConversationContextByRequestID(ctx, "req-idem")
+	require.NoError(t, err)
+	assert.Equal(t, streamStatus, got.StreamStatus)
 }
 
 func TestUpsertConversationContextLogIDPriority(t *testing.T) {

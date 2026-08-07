@@ -73,6 +73,7 @@ export const conversationContextSchema = z.object({
   request_body: z.string().default(''),
   response_body: z.string().default(''),
   request_meta: z.string().default(''),
+  stream_status: z.string().default(''),
   response_status: z.number().default(0),
   is_stream: z.boolean().default(false),
   capture_status: z.string().default(''),

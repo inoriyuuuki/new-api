@@ -1114,8 +1114,16 @@ export function DetailsDialog(props: DetailsDialogProps) {
               label={t('Status')}
               value={
                 <StatusBadge
-                  label={other.stream_status.status || t('Error')}
-                  variant='red'
+                  label={
+                    other.stream_status.status === 'warning'
+                      ? t('Warning')
+                      : other.stream_status.status || t('Error')
+                  }
+                  variant={
+                    other.stream_status.status === 'warning'
+                      ? 'warning'
+                      : 'red'
+                  }
                   size='sm'
                   copyable={false}
                 />

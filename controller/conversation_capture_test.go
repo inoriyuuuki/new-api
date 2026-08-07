@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -280,4 +281,44 @@ func TestConversationSpoolClosedRejectsWrites(t *testing.T) {
 	assert.Error(t, err)
 	_, err = spool.String()
 	assert.Error(t, err)
+}
+
+func TestCaptureStreamStatusPersisted(t *testing.T) {
+	c, _ := newCaptureTestContext(http.MethodPost, "/v1/responses", `{"model":"m"}`, "application/json")
+	capture := newConversationCapture(c, types.RelayFormatOpenAIResponses)
+	require.NotNil(t, capture)
+
+	info := &relaycommon.RelayInfo{IsStream: true}
+	info.StreamStatus = relaycommon.NewStreamStatus()
+	info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonClientGone, fmt.Errorf("context canceled"))
+	info.StreamStatus.RecordError("bad json")
+	capture.setRelayInfo(info)
+
+	record := capture.buildRecord(c)
+	require.NotNil(t, record)
+	require.NotEmpty(t, record.StreamStatus)
+
+	var parsed map[string]interface{}
+	require.NoError(t, common.UnmarshalJsonStr(record.StreamStatus, &parsed))
+	assert.Equal(t, "error", parsed["status"])
+	assert.Equal(t, "client_gone", parsed["end_reason"])
+	assert.Equal(t, "context canceled", parsed["end_error"])
+	assert.Equal(t, float64(1), parsed["error_count"])
+	capture.cleanup()
+}
+
+func TestCaptureStreamStatusEmptyForNonStream(t *testing.T) {
+	c, _ := newCaptureTestContext(http.MethodPost, "/v1/chat/completions", `{"model":"m"}`, "application/json")
+	capture := newConversationCapture(c, types.RelayFormatOpenAI)
+	require.NotNil(t, capture)
+
+	info := &relaycommon.RelayInfo{IsStream: false}
+	info.StreamStatus = relaycommon.NewStreamStatus()
+	info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonDone, nil)
+	capture.setRelayInfo(info)
+
+	record := capture.buildRecord(c)
+	require.NotNil(t, record)
+	assert.Empty(t, record.StreamStatus)
+	capture.cleanup()
 }

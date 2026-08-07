@@ -27,8 +27,9 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import { Badge, type badgeVariants } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+
+import { CollapsibleSection } from './collapsible-section'
 
 import {
   buildConversationMessages,
@@ -113,23 +114,21 @@ export function ConversationMessagesView({
   if (messages.length === 0) return null
 
   return (
-    <Card>
-      <CardHeader className='flex-row items-center justify-between gap-2 border-b'>
-        <CardTitle className='text-sm font-semibold'>
-          {t('Message List')}
-        </CardTitle>
+    <CollapsibleSection
+      title={t('Message List')}
+      badge={
         <Badge variant='secondary'>
           {messages.length} {t('Messages')}
         </Badge>
-      </CardHeader>
-      <CardContent className='px-0 py-0'>
-        <Accordion multiple defaultValue={defaultOpenValues}>
-          {messages.map((message) => (
-            <ConversationMessageItem key={message.index} message={message} />
-          ))}
-        </Accordion>
-      </CardContent>
-    </Card>
+      }
+      contentClassName='px-0 py-0'
+    >
+      <Accordion multiple defaultValue={defaultOpenValues}>
+        {messages.map((message) => (
+          <ConversationMessageItem key={message.index} message={message} />
+        ))}
+      </Accordion>
+    </CollapsibleSection>
   )
 }
 

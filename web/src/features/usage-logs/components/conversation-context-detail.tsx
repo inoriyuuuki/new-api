@@ -18,14 +18,15 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useNavigate } from '@tanstack/react-router'
 import { Check, Copy, Loader2, Star, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { StatusBadge } from '@/components/status-badge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
@@ -39,6 +40,7 @@ import {
   useFavoriteConversationContext,
 } from '../hooks/use-conversation-contexts'
 import type { ConversationContext, FavoriteConversationContext } from '../types'
+import { CollapsibleSection } from './collapsible-section'
 import { ConversationMessagesView } from './conversation-messages-view'
 
 /**
@@ -78,18 +80,22 @@ function DetailRow({
 function JsonBlock({
   title,
   value,
+  defaultExpanded = false,
 }: {
   title: string
   value: string | undefined
+  defaultExpanded?: boolean
 }) {
   const { t } = useTranslation()
   const { copiedText, copyToClipboard } = useCopyToClipboard()
   const formatted = formatJsonText(value)
 
   return (
-    <Card>
-      <CardHeader className='flex-row items-center justify-between gap-2 border-b'>
-        <CardTitle className='text-sm font-semibold'>{title}</CardTitle>
+    <CollapsibleSection
+      title={title}
+      defaultExpanded={defaultExpanded}
+      contentClassName='px-0 pb-0'
+      actions={
         <Button
           variant='ghost'
           size='sm'
@@ -108,13 +114,86 @@ function JsonBlock({
           )}
           {t('Copy')}
         </Button>
-      </CardHeader>
-      <CardContent className='px-0 pb-0'>
-        <pre className='bg-muted/40 max-h-[480px] overflow-auto px-4 py-3 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap'>
-          {formatted || t('Empty')}
-        </pre>
-      </CardContent>
-    </Card>
+      }
+    >
+      <pre className='bg-muted/40 max-h-[480px] overflow-auto px-4 py-3 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap'>
+        {formatted || t('Empty')}
+      </pre>
+    </CollapsibleSection>
+  )
+}
+
+/** Parsed view of the persisted stream_status JSON snapshot. */
+interface StreamStatusInfo {
+  status?: string
+  end_reason?: string
+  end_error?: string
+  error_count?: number
+  errors?: string[]
+}
+
+function parseStreamStatus(value: string | undefined): StreamStatusInfo | null {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  try {
+    return JSON.parse(trimmed) as StreamStatusInfo
+  } catch {
+    return null
+  }
+}
+
+function StreamStatusSection({ value }: { value: string | undefined }) {
+  const { t } = useTranslation()
+  const info = useMemo(() => parseStreamStatus(value), [value])
+
+  // Nothing captured (non-stream call or older record): hide the area.
+  if (!info) return null
+
+  let statusLabel = info.status || '-'
+  let statusVariant: 'success' | 'warning' | 'red' | 'neutral' = 'neutral'
+  if (info.status === 'ok') {
+    statusLabel = t('Success')
+    statusVariant = 'success'
+  } else if (info.status === 'warning') {
+    statusLabel = t('Warning')
+    statusVariant = 'warning'
+  } else if (info.status === 'error') {
+    statusLabel = t('Error')
+    statusVariant = 'red'
+  }
+
+  return (
+    <CollapsibleSection title={t('Stream Status')}>
+      <div className='space-y-2.5'>
+        <DetailRow label={t('Status')}>
+          <StatusBadge
+            label={statusLabel}
+            variant={statusVariant}
+            size='sm'
+            copyable={false}
+          />
+        </DetailRow>
+        <DetailRow label={t('End Reason')} mono>
+          {info.end_reason || '-'}
+        </DetailRow>
+        {(info.error_count ?? 0) > 0 && (
+          <DetailRow label={t('Soft Errors')}>
+            {String(info.error_count)}
+          </DetailRow>
+        )}
+        {info.end_error && (
+          <DetailRow label={t('End Error')} mono>
+            {info.end_error}
+          </DetailRow>
+        )}
+        {Array.isArray(info.errors) && info.errors.length > 0 && (
+          <pre className='bg-muted/40 max-h-48 overflow-auto rounded-md px-3 py-2.5 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap'>
+            {info.errors.join('\n')}
+          </pre>
+        )}
+      </div>
+    </CollapsibleSection>
   )
 }
 
@@ -149,13 +228,8 @@ function MetaGrid({
   const isFavoriteSnapshot = 'favorited_at' in context
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className='text-sm font-semibold'>
-          {t('Request Metadata')}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className='space-y-2.5'>
+    <CollapsibleSection title={t('Request Metadata')} defaultExpanded>
+      <div className='space-y-2.5'>
         <DetailRow label={t('Request ID')} mono>
           {context.request_id || '-'}
         </DetailRow>
@@ -202,8 +276,8 @@ function MetaGrid({
             {favoriteLabel}
           </Badge>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleSection>
   )
 }
 
@@ -305,6 +379,8 @@ export function ConversationContextDetail({
 
         <MetaGrid context={data} />
 
+        <StreamStatusSection value={data.stream_status} />
+
         <JsonBlock title={t('Request Parameters')} value={data.request_meta} />
 
         <ConversationMessagesView
@@ -362,6 +438,8 @@ export function ConversationContextDetail({
       </div>
 
       <MetaGrid context={data} />
+
+      <StreamStatusSection value={data.stream_status} />
 
       <JsonBlock title={t('Request Parameters')} value={data.request_meta} />
 

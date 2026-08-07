@@ -280,6 +280,12 @@ func OaiResponsesToChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 			return
 		}
 
+		if streamResp.Type == "response.completed" || streamResp.Type == "response.done" {
+			// The terminal event was delivered; a subsequent client disconnect
+			// is classified as a warning rather than a stream error.
+			info.StreamStatus.MarkCompleted()
+		}
+
 		if streamResp.Type == "response.error" || streamResp.Type == "response.failed" {
 			if streamResp.Response != nil {
 				if oaiErr := streamResp.Response.GetOpenAIError(); oaiErr != nil && oaiErr.Type != "" {

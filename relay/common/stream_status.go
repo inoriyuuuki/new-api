@@ -33,7 +33,11 @@ type StreamStatus struct {
 	EndError  error
 	endOnce   sync.Once
 
-	mu         sync.Mutex
+	mu sync.Mutex
+	// Completed records that the stream's terminal event (e.g.
+	// response.completed / response.done) was delivered. A client disconnect
+	// after the terminal event is a soft warning instead of an error.
+	Completed  bool
 	Errors     []StreamErrorEntry
 	ErrorCount int
 }
@@ -67,6 +71,29 @@ func (s *StreamStatus) RecordError(msg string) {
 	}
 }
 
+// MarkCompleted records that the stream's terminal event (e.g.
+// response.completed / response.done) was received and delivered, so a later
+// client disconnect can be classified as a warning instead of an error.
+func (s *StreamStatus) MarkCompleted() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.Completed = true
+	s.mu.Unlock()
+}
+
+// IsCompleted reports whether the terminal event was delivered before the
+// stream ended.
+func (s *StreamStatus) IsCompleted() bool {
+	if s == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.Completed
+}
+
 func (s *StreamStatus) HasErrors() bool {
 	if s == nil {
 		return false
@@ -92,6 +119,40 @@ func (s *StreamStatus) IsNormalEnd() bool {
 	return s.EndReason == StreamEndReasonDone ||
 		s.EndReason == StreamEndReasonEOF ||
 		s.EndReason == StreamEndReasonHandlerStop
+}
+
+// ToMap returns the admin-facing stream_status snapshot (status, end_reason
+// and, when present, end_error / error_count / errors) that is written into
+// usage log and conversation context records. A nil receiver yields an empty
+// map so callers can skip nil checks.
+func (s *StreamStatus) ToMap() map[string]interface{} {
+	if s == nil {
+		return map[string]interface{}{}
+	}
+	status := "ok"
+	if s.EndReason == StreamEndReasonClientGone && s.IsCompleted() {
+		// The terminal event was already delivered to the client; the client
+		// merely dropped the connection afterwards. Not a real stream error.
+		status = "warning"
+	} else if !s.IsNormalEnd() || s.HasErrors() {
+		status = "error"
+	}
+	info := map[string]interface{}{
+		"status":     status,
+		"end_reason": string(s.EndReason),
+	}
+	if s.EndError != nil {
+		info["end_error"] = s.EndError.Error()
+	}
+	if s.ErrorCount > 0 {
+		info["error_count"] = s.ErrorCount
+		messages := make([]string, 0, len(s.Errors))
+		for _, e := range s.Errors {
+			messages = append(messages, e.Message)
+		}
+		info["errors"] = messages
+	}
+	return info
 }
 
 func (s *StreamStatus) Summary() string {

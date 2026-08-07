@@ -38,6 +38,10 @@ type ConversationContext struct {
 	// (method, path with query parameters, headers). Sensitive values are
 	// redacted before persistence; see common.BuildRequestMeta.
 	RequestMeta string `gorm:"type:text" json:"request_meta"`
+	// StreamStatus is a JSON snapshot of the relay stream end state
+	// (status/end_reason/end_error/error_count/errors), mirroring the usage
+	// log's other.stream_status. Empty for non-stream calls.
+	StreamStatus string `gorm:"type:text" json:"stream_status"`
 	// IsFavorite is computed at read time from DB B and never persisted.
 	IsFavorite bool `gorm:"-" json:"is_favorite"`
 }
@@ -94,6 +98,7 @@ type FavoriteConversationContext struct {
 	IsStream       bool                        `json:"is_stream"`
 	CaptureStatus  string                      `gorm:"type:varchar(32)" json:"capture_status"`
 	RequestMeta    FavoriteRequestMeta         `json:"request_meta"`
+	StreamStatus   string                      `gorm:"type:text" json:"stream_status"`
 	IsFavorite     bool                        `gorm:"-" json:"is_favorite"`
 }
 
@@ -223,6 +228,7 @@ func UpsertConversationContext(ctx context.Context, record *ConversationContext)
 		"is_stream":       record.IsStream,
 		"capture_status":  record.CaptureStatus,
 		"request_meta":    record.RequestMeta,
+		"stream_status":   record.StreamStatus,
 	}
 	return CONVERSATION_DB.WithContext(ctx).Model(&ConversationContext{}).
 		Where("id = ?", existing.ID).Updates(updates).Error

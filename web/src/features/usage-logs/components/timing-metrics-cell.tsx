@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { CircleAlert } from 'lucide-react'
+import { CircleAlert, TriangleAlert } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -158,8 +158,13 @@ interface StreamTpsCellProps {
 
 export function StreamTpsCell(props: StreamTpsCellProps) {
   const { t } = useTranslation()
-  const showStreamError =
-    props.isStream && props.streamStatus && props.streamStatus.status !== 'ok'
+  const streamStatus = props.streamStatus
+  // `error` marks real stream problems (red), `warning` marks a client that
+  // disconnected after the terminal event was fully delivered (yellow).
+  let streamAlert: 'error' | 'warning' | null = null
+  if (props.isStream && streamStatus && streamStatus.status !== 'ok') {
+    streamAlert = streamStatus.status === 'warning' ? 'warning' : 'error'
+  }
   const tpsLabel =
     props.tokensPerSecond != null
       ? `${Math.round(props.tokensPerSecond)} t/s`
@@ -180,21 +185,28 @@ export function StreamTpsCell(props: StreamTpsCellProps) {
         )}
       >
         {streamLabel}
-        {showStreamError && (
+        {streamAlert && (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger
-                render={<CircleAlert className='text-destructive size-3' />}
+                render={
+                  streamAlert === 'warning' ? (
+                    <TriangleAlert className='text-warning size-3' />
+                  ) : (
+                    <CircleAlert className='text-destructive size-3' />
+                  )
+                }
               />
               <TooltipContent>
                 <div className='space-y-0.5 text-xs'>
                   <p>
-                    {t('Stream Status')}: {t('Error')}
+                    {t('Stream Status')}:{' '}
+                    {streamAlert === 'warning' ? t('Warning') : t('Error')}
                   </p>
-                  <p>{props.streamStatus?.end_reason || 'unknown'}</p>
-                  {(props.streamStatus?.error_count ?? 0) > 0 && (
+                  <p>{streamStatus?.end_reason || 'unknown'}</p>
+                  {(streamStatus?.error_count ?? 0) > 0 && (
                     <p>
-                      {t('Soft Errors')}: {props.streamStatus?.error_count}
+                      {t('Soft Errors')}: {streamStatus?.error_count}
                     </p>
                   )}
                 </div>
