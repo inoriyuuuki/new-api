@@ -143,54 +143,226 @@ function parseStreamStatus(value: string | undefined): StreamStatusInfo | null {
   }
 }
 
-function StreamStatusSection({ value }: { value: string | undefined }) {
+/** Client-visible terminal state extracted from the captured response body. */
+interface TerminalEventInfo {
+  kind: 'completed' | 'done' | 'failed' | 'incomplete' | 'cancelled' | 'error'
+  detail?: string
+}
+
+function extractErrorDetail(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== 'object') return undefined
+  const obj = payload as Record<string, unknown>
+  const err = obj.error
+  if (err && typeof err === 'object') {
+    const message = (err as Record<string, unknown>).message
+    if (typeof message === 'string' && message) return message
+  }
+  if (typeof err === 'string' && err) return err
+  return undefined
+}
+
+function extractIncompleteDetail(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== 'object') return undefined
+  const details = (payload as Record<string, unknown>).incomplete_details
+  if (details && typeof details === 'object') {
+    const reason = (details as Record<string, unknown>).reason
+    if (typeof reason === 'string' && reason) return reason
+  }
+  return undefined
+}
+
+/**
+ * Best-effort extraction of the terminal event from the captured response
+ * body. The terminal state always sits at the tail of a stream, so only the
+ * last chunk is scanned to keep large captures cheap.
+ */
+function parseTerminalEvent(
+  responseBody: string | undefined
+): TerminalEventInfo | null {
+  if (!responseBody) return null
+  const tail = responseBody.slice(-64 * 1024)
+
+  let terminal: TerminalEventInfo | null = null
+  for (const line of tail.split('\n')) {
+    const trimmedLine = line.trim()
+    let payload = ''
+    if (trimmedLine === '[DONE]') {
+      payload = '[DONE]'
+    } else if (trimmedLine.startsWith('data:')) {
+      payload = trimmedLine.slice(5).trim()
+    }
+    if (!payload) continue
+
+    if (payload === '[DONE]') {
+      terminal = { kind: 'done' }
+      continue
+    }
+    let obj: unknown
+    try {
+      obj = JSON.parse(payload)
+    } catch {
+      continue
+    }
+    if (!obj || typeof obj !== 'object') continue
+    const record = obj as Record<string, unknown>
+    const type = record.type
+    if (type === 'response.completed' || type === 'response.done') {
+      terminal = { kind: 'completed' }
+    } else if (type === 'response.failed') {
+      terminal = { kind: 'failed', detail: extractErrorDetail(record) }
+    } else if (type === 'response.incomplete') {
+      terminal = {
+        kind: 'incomplete',
+        detail: extractIncompleteDetail(record),
+      }
+    } else if (type === 'response.cancelled' || type === 'response.canceled') {
+      terminal = { kind: 'cancelled' }
+    } else if (record.error) {
+      terminal = { kind: 'error', detail: extractErrorDetail(record) }
+    }
+  }
+
+  // Fallback for plain JSON bodies (non-stream): a top-level error object.
+  if (!terminal) {
+    try {
+      const obj = JSON.parse(tail)
+      if (obj && typeof obj === 'object') {
+        const record = obj as Record<string, unknown>
+        if (record.error) {
+          terminal = { kind: 'error', detail: extractErrorDetail(record) }
+        }
+      }
+    } catch {
+      // Not JSON; nothing else to infer.
+    }
+  }
+  return terminal
+}
+
+/**
+ * Request-level diagnostics: HTTP status, capture status, the client-visible
+ * terminal event of the reply, and the relay stream status (end reason, soft
+ * errors). Lets admins tell apart a normal request from an interrupted or
+ * abnormal one at a glance.
+ */
+function RequestStatusSection({
+  context,
+}: {
+  context: ConversationContext | FavoriteConversationContext
+}) {
   const { t } = useTranslation()
-  const info = useMemo(() => parseStreamStatus(value), [value])
+  const streamInfo = useMemo(
+    () => parseStreamStatus(context.stream_status),
+    [context.stream_status]
+  )
+  const terminal = useMemo(
+    () => parseTerminalEvent(context.response_body),
+    [context.response_body]
+  )
 
-  // Nothing captured (non-stream call or older record): hide the area.
-  if (!info) return null
+  let streamLabel = '-'
+  let streamVariant: 'success' | 'warning' | 'red' | 'neutral' = 'neutral'
+  if (streamInfo) {
+    if (streamInfo.status === 'ok') {
+      streamLabel = t('Success')
+      streamVariant = 'success'
+    } else if (streamInfo.status === 'warning') {
+      streamLabel = t('Warning')
+      streamVariant = 'warning'
+    } else if (streamInfo.status === 'error') {
+      streamLabel = t('Error')
+      streamVariant = 'red'
+    } else {
+      streamLabel = streamInfo.status || '-'
+    }
+  }
 
-  let statusLabel = info.status || '-'
-  let statusVariant: 'success' | 'warning' | 'red' | 'neutral' = 'neutral'
-  if (info.status === 'ok') {
-    statusLabel = t('Success')
-    statusVariant = 'success'
-  } else if (info.status === 'warning') {
-    statusLabel = t('Warning')
-    statusVariant = 'warning'
-  } else if (info.status === 'error') {
-    statusLabel = t('Error')
-    statusVariant = 'red'
+  let terminalLabel = t('Unknown')
+  let terminalVariant: 'success' | 'warning' | 'red' | 'neutral' = 'neutral'
+  if (terminal) {
+    switch (terminal.kind) {
+      case 'completed':
+        terminalLabel = t('Completed')
+        terminalVariant = 'success'
+        break
+      case 'done':
+        terminalLabel = t('Done')
+        terminalVariant = 'success'
+        break
+      case 'failed':
+        terminalLabel = t('Failed')
+        terminalVariant = 'red'
+        break
+      case 'error':
+        terminalLabel = t('Error')
+        terminalVariant = 'red'
+        break
+      case 'incomplete':
+        terminalLabel = t('Incomplete')
+        terminalVariant = 'warning'
+        break
+      case 'cancelled':
+        terminalLabel = t('Cancelled')
+        terminalVariant = 'warning'
+        break
+    }
   }
 
   return (
-    <CollapsibleSection title={t('Stream Status')}>
+    <CollapsibleSection title={t('Request Status')}>
       <div className='space-y-2.5'>
-        <DetailRow label={t('Status')}>
-          <StatusBadge
-            label={statusLabel}
-            variant={statusVariant}
-            size='sm'
-            copyable={false}
-          />
+        <DetailRow label={t('Response Status')} mono>
+          {context.response_status != null
+            ? String(context.response_status)
+            : '-'}
         </DetailRow>
-        <DetailRow label={t('End Reason')} mono>
-          {info.end_reason || '-'}
+        <DetailRow label={t('Capture Status')}>
+          {context.capture_status || '-'}
         </DetailRow>
-        {(info.error_count ?? 0) > 0 && (
-          <DetailRow label={t('Soft Errors')}>
-            {String(info.error_count)}
+        {terminal && (
+          <DetailRow label={t('Terminal Event')}>
+            <StatusBadge
+              label={terminalLabel}
+              variant={terminalVariant}
+              size='sm'
+              copyable={false}
+            />
           </DetailRow>
         )}
-        {info.end_error && (
-          <DetailRow label={t('End Error')} mono>
-            {info.end_error}
-          </DetailRow>
-        )}
-        {Array.isArray(info.errors) && info.errors.length > 0 && (
+        {terminal?.detail && (
           <pre className='bg-muted/40 max-h-48 overflow-auto rounded-md px-3 py-2.5 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap'>
-            {info.errors.join('\n')}
+            {terminal.detail}
           </pre>
+        )}
+        {streamInfo && (
+          <>
+            <DetailRow label={t('Stream Status')}>
+              <StatusBadge
+                label={streamLabel}
+                variant={streamVariant}
+                size='sm'
+                copyable={false}
+              />
+            </DetailRow>
+            <DetailRow label={t('End Reason')} mono>
+              {streamInfo.end_reason || '-'}
+            </DetailRow>
+            {(streamInfo.error_count ?? 0) > 0 && (
+              <DetailRow label={t('Soft Errors')}>
+                {String(streamInfo.error_count)}
+              </DetailRow>
+            )}
+            {streamInfo.end_error && (
+              <DetailRow label={t('End Error')} mono>
+                {streamInfo.end_error}
+              </DetailRow>
+            )}
+            {Array.isArray(streamInfo.errors) && streamInfo.errors.length > 0 && (
+              <pre className='bg-muted/40 max-h-48 overflow-auto rounded-md px-3 py-2.5 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap'>
+                {streamInfo.errors.join('\n')}
+              </pre>
+            )}
+          </>
         )}
       </div>
     </CollapsibleSection>
@@ -259,15 +431,7 @@ function MetaGrid({
           {context.relay_format || '-'}
         </DetailRow>
         <DetailRow label={t('Model')}>{context.model_name || '-'}</DetailRow>
-        <DetailRow label={t('Response Status')} mono>
-          {context.response_status != null
-            ? String(context.response_status)
-            : '-'}
-        </DetailRow>
         <DetailRow label={t('Stream')}>{isStreamLabel}</DetailRow>
-        <DetailRow label={t('Capture Status')}>
-          {context.capture_status || '-'}
-        </DetailRow>
         <div className='flex items-center gap-2 pt-1'>
           <Label className='text-muted-foreground text-xs'>
             {t('Favorite')}
@@ -379,7 +543,7 @@ export function ConversationContextDetail({
 
         <MetaGrid context={data} />
 
-        <StreamStatusSection value={data.stream_status} />
+        <RequestStatusSection context={data} />
 
         <JsonBlock title={t('Request Parameters')} value={data.request_meta} />
 
@@ -439,7 +603,7 @@ export function ConversationContextDetail({
 
       <MetaGrid context={data} />
 
-      <StreamStatusSection value={data.stream_status} />
+      <RequestStatusSection context={data} />
 
       <JsonBlock title={t('Request Parameters')} value={data.request_meta} />
 
