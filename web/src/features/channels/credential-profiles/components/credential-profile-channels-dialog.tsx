@@ -17,8 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { Loader2, Search } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -31,7 +31,6 @@ import { StatusBadge } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Tooltip,
   TooltipContent,
@@ -53,8 +52,13 @@ import type {
   CredentialProfileBindResultItem,
   CredentialProfileChannel,
 } from '../types'
+import type { Channel } from '../../types'
 
-const CHANNEL_PICKER_PAGE_SIZE = 20
+// The picker shows every channel in one scrollable list; the page size only
+// bounds each API request (backend caps at 100) and the page count is a
+// defensive cap against runaway loops.
+const CHANNEL_PICKER_PAGE_SIZE = 100
+const CHANNEL_PICKER_MAX_PAGES = 100
 
 type DialogView = 'picker' | 'results'
 
@@ -90,7 +94,6 @@ export function CredentialProfileChannelsDialog({
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [view, setView] = useState<DialogView>('picker')
-  const [page, setPage] = useState(1)
   const [keyword, setKeyword] = useState('')
   const debouncedKeyword = useDebounce(keyword, 300)
   const [selectedIds, setSelectedIds] = useState<Set<number> | null>(null)
@@ -109,35 +112,45 @@ export function CredentialProfileChannelsDialog({
       'channel-credential-profiles',
       'picker',
       profile?.id,
-      page,
       debouncedKeyword,
     ],
     queryFn: async () => {
       const trimmed = debouncedKeyword.trim()
-      if (trimmed) {
-        return searchChannels({
-          keyword: trimmed,
-          p: page,
-          page_size: CHANNEL_PICKER_PAGE_SIZE,
-        })
+      const byId = new Map<number, Channel>()
+      let page = 1
+      while (page <= CHANNEL_PICKER_MAX_PAGES) {
+        const res = trimmed
+          ? await searchChannels({
+              keyword: trimmed,
+              p: page,
+              page_size: CHANNEL_PICKER_PAGE_SIZE,
+            })
+          : await getChannels({
+              p: page,
+              page_size: CHANNEL_PICKER_PAGE_SIZE,
+            })
+        const items = res.data?.items ?? []
+        for (const item of items) {
+          byId.set(item.id, item)
+        }
+        const total = res.data?.total ?? items.length
+        if (items.length < CHANNEL_PICKER_PAGE_SIZE || byId.size >= total) {
+          break
+        }
+        page += 1
       }
-      return getChannels({
-        p: page,
-        page_size: CHANNEL_PICKER_PAGE_SIZE,
-      })
+      const items = [...byId.values()]
+      return { data: { items, total: items.length } }
     },
     enabled: open && profile !== null,
-    placeholderData: (previousData) => previousData,
   })
 
   const boundChannels = channelsQuery.data?.data
   const pickerItems = pickerQuery.data?.data?.items ?? []
-  const pickerTotal = pickerQuery.data?.data?.total ?? 0
 
   useEffect(() => {
     if (open) {
       setView('picker')
-      setPage(1)
       setKeyword('')
       setSelectedIds(null)
       setBindResult(null)
@@ -150,8 +163,10 @@ export function CredentialProfileChannelsDialog({
     }
   }, [selectedIds, boundChannels])
 
+  const tableScrollRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
-    setPage(1)
+    tableScrollRef.current?.scrollTo({ top: 0 })
   }, [debouncedKeyword])
 
   const boundById = useMemo(() => {
@@ -375,11 +390,6 @@ export function CredentialProfileChannelsDialog({
       },
     ]
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(pickerTotal / CHANNEL_PICKER_PAGE_SIZE)
-  )
-
   const bindFailed = bindResult?.failed ?? 0
   const conflictIds = bindResult?.conflict_ids ?? []
 
@@ -447,7 +457,7 @@ export function CredentialProfileChannelsDialog({
             </StatusBadge>
           </div>
 
-          <ScrollArea className='max-h-96 rounded-md border'>
+          <div className='max-h-96 overflow-y-auto rounded-md border'>
             <StaticDataTable
               columns={resultColumns}
               data={bindResult.results ?? []}
@@ -458,7 +468,7 @@ export function CredentialProfileChannelsDialog({
                 </p>
               }
             />
-          </ScrollArea>
+          </div>
         </>
       ) : (
         <>
@@ -490,47 +500,29 @@ export function CredentialProfileChannelsDialog({
             />
           </div>
 
-          <ScrollArea className='max-h-96 rounded-md border'>
-            <StaticDataTable
-              columns={columns}
-              data={pickerItems}
-              getRowKey={(row) => row.id}
-              emptyContent={
-                <p className='text-muted-foreground text-sm'>
-                  {t('No matching channels')}
-                </p>
-              }
-            />
-          </ScrollArea>
-
-          <div className='flex items-center justify-between gap-2'>
-            <p className='text-muted-foreground text-sm'>
-              {t('Page {{current}} of {{total}}', {
-                current: page,
-                total: totalPages,
-              })}
-            </p>
-            <div className='flex items-center gap-2'>
-              <Button
-                variant='outline'
-                size='icon'
-                disabled={page <= 1 || pickerQuery.isFetching}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                aria-label={t('Previous')}
-              >
-                <ChevronLeft />
-              </Button>
-              <Button
-                variant='outline'
-                size='icon'
-                disabled={page >= totalPages || pickerQuery.isFetching}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                aria-label={t('Next')}
-              >
-                <ChevronRight />
-              </Button>
+          {pickerQuery.isPending && pickerItems.length === 0 ? (
+            <div className='border-border/60 flex items-center justify-center gap-2 rounded-md border py-10 text-sm text-muted-foreground'>
+              <Loader2 className='animate-spin size-4' />
+              {t('Loading')}
             </div>
-          </div>
+          ) : (
+            <div
+              ref={tableScrollRef}
+              className='max-h-96 overflow-y-auto rounded-md border'
+            >
+              <StaticDataTable
+                columns={columns}
+                data={pickerItems}
+                getRowKey={(row) => row.id}
+                emptyContent={
+                  <p className='text-muted-foreground text-sm'>
+                    {t('No matching channels')}
+                  </p>
+                }
+              />
+            </div>
+          )}
+
         </>
       )}
     </Dialog>

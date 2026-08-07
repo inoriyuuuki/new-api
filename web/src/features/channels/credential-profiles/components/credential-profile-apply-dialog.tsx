@@ -30,7 +30,6 @@ import { Dialog } from '@/components/dialog'
 import { StatusBadge } from '@/components/status-badge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 
 import { channelsQueryKeys, getChannelTypeLabel } from '../../lib'
 import { applyCredentialProfile } from '../api'
@@ -317,13 +316,13 @@ export function CredentialProfileApplyDialog({
       )
     }
     return (
-      <ScrollArea className='max-h-80 rounded-md border'>
+      <div className='max-h-80 overflow-y-auto rounded-md border'>
         <StaticDataTable
           columns={columns}
           data={data.results ?? []}
           getRowKey={(row) => row.channel_id}
         />
-      </ScrollArea>
+      </div>
     )
   }
 }
